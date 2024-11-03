@@ -31,8 +31,9 @@ sampler = Sampler()
 fidelity = ComputeUncompute(sampler=sampler)
 
 
-
 adhoc_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=adhoc_feature_map)
+
+
 
 #evaluate sarà la funzione che dato
 adhoc_svc = SVC(kernel=adhoc_kernel.evaluate)

@@ -1,4 +1,6 @@
 import qiskit as qk
+from qiskit.circuit.library import ZZFeatureMap
+
 
 # Creating Qubits
 q = qk.QuantumRegister(2)
@@ -17,14 +19,17 @@ circuit = qk.QuantumCircuit(q, c)
 
 
 
-print (circuit)
+feature_map = ZZFeatureMap(feature_dimension=3, reps=2, entanglement="linear")
+
+print(feature_map.decompose())
+# print (circuit)
 # Using Qiskit Aer's Qasm Simulator: Define where do you want to run the simulation.
-simulator = qk.BasicAer.get_backend('qasm_simulator')
+# simulator = qk.BasicAer.get_backend('qasm_simulator')
 
-# Simulating the circuit using the simulator to get the result
-job = qk.execute(circuit, simulator, shots=100)
-result = job.result()
+# # Simulating the circuit using the simulator to get the result
+# job = qk.execute(circuit, simulator, shots=100)
+# result = job.result()
 
-# Getting the aggregated binary outcomes of the circuit.
-counts = result.get_counts(circuit)
-print (counts)
+# # Getting the aggregated binary outcomes of the circuit.
+# counts = result.get_counts(circuit)
+# print (counts)

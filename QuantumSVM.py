@@ -37,10 +37,34 @@ estimator = Estimator()
 
 fidelity = ComputeUncompute(sampler=sampler)
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> e173f33ab170db0dd6e1a83db794de6b9e13e783
 adhoc_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=adhoc_feature_map)
 adhoc_ansatz = RealAmplitudes(num_qubits=adhoc_dimension, entanglement=ent, reps=adhoc_reps, insert_barriers=True)
 
+<<<<<<< HEAD
 vqc = VQC(num_qubits=adhoc_dimension,feature_map=adhoc_feature_map, ansatz=adhoc_ansatz)
+=======
+<<<<<<< HEAD
+
+
+#evaluate sarà la funzione che dato
+adhoc_svc = SVC(kernel=adhoc_kernel.evaluate)
+=======
+#qsvc = QSVC(quantum_kernel=adhoc_kernel)
+>>>>>>> ec59e20c60be5913b8a2f907dfd1bb9006cb96b3
+
+#qsvc.fit(train_features, train_labels)
+
+#qsvc_score = qsvc.score(test_features, test_labels)
+
+
+#print(f"Callable kernel classification test score: {qsvc_score}")
+
+vqc = VQC(num_qubits=adhoc_dimension,)
+>>>>>>> e173f33ab170db0dd6e1a83db794de6b9e13e783
 
 vqc.circuit.decompose().draw(output="mpl",style="clifford")
 

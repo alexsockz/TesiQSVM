@@ -31,16 +31,11 @@ adhoc_feature_map = ZZFeatureMap(feature_dimension=adhoc_dimension, reps=2, enta
 
 backend = service.least_busy(operational=True, simulator=False)
 session = Session(backend=backend)
-sampler = Sampler(mode=session
-)
+sampler = Sampler(mode=session)
 estimator = Estimator()
 
 fidelity = ComputeUncompute(sampler=sampler)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> e173f33ab170db0dd6e1a83db794de6b9e13e783
 adhoc_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=adhoc_feature_map)
 adhoc_ansatz = RealAmplitudes(num_qubits=adhoc_dimension, entanglement=ent, reps=adhoc_reps, insert_barriers=True)
 

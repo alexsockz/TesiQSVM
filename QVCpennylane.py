@@ -79,9 +79,9 @@ def circuit(weights, x):
         feature_map_layer(x)
         qml.Barrier(range(dimensions))
     ansatz(weights, num_layers)
+    #metodo vecchio
     # for i in range(dimensions):
     #     qml.measure(i)
-
     #return qml.expval(qml.PauliZ(0))
     return (qml.counts()) 
 
@@ -106,8 +106,10 @@ def square_loss(labels, predictions):
     return np.mean((labels - np.sign(qml.math.stack(predictions))) ** 2)
 
 def sigmoid_loss(labels,predictions):
+    #copia funzione da paper
     predictions = labels,qml.math.stack(predictions)
     L=np.sig((0.5))
+    return L
 
 #è sbagliata??
 def cross_entropy_loss(labels, predictions):
@@ -191,6 +193,8 @@ for it in range(max_iterations): ## da cambiare in "fino a che non converge l'ot
         print(max(d))
     input("rpreprepr")
 
+
+#metodo vecchio
 # for it in range(max_iterations):
 #     #CAMBIA METODO DI SAMPLING
 #     # non separiamo un gruppo di training e un gruppo di test,
@@ -217,12 +221,8 @@ for it in range(max_iterations): ## da cambiare in "fino a che non converge l'ot
 #             f"Iter: {it + 1:5d} | Cost: {_cost:0.7f} | "
 #             f"Acc train: {acc_train:0.7f} | Acc validation: {acc_val:0.7f}"
 #         )
-
-
 # predictions_test = [np.sign(variational_classifier(weights, bias, x)) for x in feats_val]
-
 # for x,y,p in zip(feats_val, Y_val, predictions_test):
 #     print(f"x = {x}, y = {y}, pred={p}")
-
 # acc_test = accuracy(Y_val, predictions_test)
 # print("Accuracy on unseen data:", acc_test)

@@ -74,7 +74,8 @@ def ansatz_layer(layer_weights):
 
 def square_loss(labels, predictions):
     # We use a call to qml.math.stack to allow subtracting the arrays directly
-    print(qml.math.stack(predictions))
+    # print(predictions)
+    # print(qml.math.stack(predictions))
     return np.mean((labels - qml.math.stack(predictions)) ** 2)
 
 @qml.qnode(dev)
@@ -147,7 +148,7 @@ weights = weights_init
 bias = bias_init
 
 print_circuit(weights, X_train)
-
+input("")
 for it in range(60):
     # Update the weights by one optimizer step
     batch_index = np.random.randint(0, num_train, (batch_size,))
@@ -158,7 +159,7 @@ for it in range(60):
     # Compute predictions on train and validation set
     predictions_train = np.sign(variational_classifier(weights, bias, feats_train.T))
     predictions_val = np.sign(variational_classifier(weights, bias, feats_val.T))
-
+    
     # Compute accuracy on train and validation set
     acc_train = accuracy(Y_train, predictions_train)
     acc_val = accuracy(Y_val, predictions_val)

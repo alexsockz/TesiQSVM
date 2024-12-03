@@ -27,23 +27,22 @@ adhoc_dimension = 5
 #la feature map è la mappa di rotazioni theta applicate ad un determinato livello e altezza dell' unitario M
 #feature dimension sono il numero di feature, nel paper con 2 feature sono 5 dim,
 #reps è il numero di ripetizioni aka livelli
+
+
 adhoc_feature_map = ZZFeatureMap(feature_dimension=adhoc_dimension, reps=2, entanglement="linear")
 
-sampler = Sampler()
+adhoc_feature_map.decompose().draw(output="mpl",style="clifford", plot_barriers=True)
 
-fidelity = ComputeUncompute(sampler=sampler)
+# sampler = Sampler()
+
+# fidelity = ComputeUncompute(sampler=sampler)
 
 
-adhoc_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=adhoc_feature_map)
-
-<<<<<<< HEAD
+# adhoc_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=adhoc_feature_map)
 
 
 #evaluate sarà la funzione che dato
-adhoc_svc = SVC(kernel=adhoc_kernel.evaluate)
-=======
 #qsvc = QSVC(quantum_kernel=adhoc_kernel)
->>>>>>> ec59e20c60be5913b8a2f907dfd1bb9006cb96b3
 
 #qsvc.fit(train_features, train_labels)
 
@@ -52,9 +51,9 @@ adhoc_svc = SVC(kernel=adhoc_kernel.evaluate)
 
 #print(f"Callable kernel classification test score: {qsvc_score}")
 
-vqc = VQC(num_qubits=adhoc_dimension,)
+vqc = VQC(num_qubits=adhoc_dimension)
 
-vqc.circuit.decompose().draw(output="mpl",style="clifford")
+vqc.circuit.decompose().draw(output="mpl",style="clifford", plot_barriers=True)
 plt.show()
 
 

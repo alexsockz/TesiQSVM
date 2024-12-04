@@ -148,6 +148,7 @@ weights = weights_init
 bias = bias_init
 
 print_circuit(weights, X_train)
+print(weights)
 input("")
 for it in range(60):
     # Update the weights by one optimizer step

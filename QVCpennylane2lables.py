@@ -93,10 +93,6 @@ def variational_classifier(weights, x, labels):
         raise TypeError("x must be a 1 dim list (a data element)")
 
 def mapper(q_strings,labels):
-    #varierà a seconda dei dati, qui in pratica sto usando la parità per decidere se un risultato è +1(se pari) o -1(dispari),
-    # questa parte è a piacere e non è molto rilevante
-    # la misurazione di pennylane da {0,1}, altri potrebbero dare {-1,1}
-    #metodi che useremo "Parity" (per binari, se pari 1 se dispari -1), "modulo" (per n label fai bitstring%n)
     count={el:0 for el in labels}
     n_per_classe=pow(2,dimensions)/len(labels)
     for key, val in q_strings.items():
@@ -116,19 +112,13 @@ def square_loss(labels, predictions):
     # We use a call to qml.math.stack to allow subtracting the arrays directly
     return np.mean((labels - np.sign(qml.math.stack(predictions))) ** 2)
 
-def softmax_max(x, beta=1.0):
-
-    weights = np.exp(beta * x)  # Calcolo dei pesi esponenziali
-    weighted_sum = np.sum(x * weights)  # Somma ponderata dei valori
-    weight_total = np.sum(weights)  # Somma dei pesi
-    return weighted_sum / weight_total
 
 def prob_x_div_corretto(pmf,correct):
     #dobbiamo capire quale è la probabilità che il predict di x sia diverso dalla sua corretta label e minimizzarlo
     py=pmf[correct]
-    rest=np.array([x for i,x in enumerate(pmf) if i!=correct])
+    rest=[x for i,x in enumerate(pmf) if i!=correct]
     #print(correct, pmf, py, rest)
-    f=np.sqrt(shots)*((softmax_max(rest)-py)/np.sqrt(2*(1-py)*py))
+    f=np.sqrt(shots)*((max(rest)-py)/(np.sqrt(2*(1-py)*py)+1e-10))
     p=1/(1+np.exp(-f))
     return p
 
@@ -233,7 +223,7 @@ def initialize_hyperparameters(alpha, lossFunction, w0, N_iterations):
  
     return a, A, c
 
-def SPSA(LossFunction, parameters, alpha=0.602, gamma=0.101, N_iterations=50):
+def SPSA(LossFunction, parameters, alpha=0.602, gamma=0.101, N_iterations=10):
      
     # model's parameters
     w = parameters
@@ -247,7 +237,7 @@ def SPSA(LossFunction, parameters, alpha=0.602, gamma=0.101, N_iterations=50):
         # estimate gradient
         gk = grad(LossFunction, w, ck)
         # update parameters
-        w -= ak*gk
+        w += ak*gk
  
     return w
 ################### main ###################
@@ -333,8 +323,28 @@ print(accuracy(Y_train,pred))
 # )
 
 
-weights2 = SPSA(LossFunction = lambda parameters: cost_function(parameters, feats_train, Y_train),
-                  parameters = weights)
+for it in range(100):
+
+    # Update the weights by one optimizer step, using only a limited batch of data
+    batch_index = np.random.randint(0, len(X), (batch_size,))
+    X_batch = X[batch_index]
+    Y_batch = Y[batch_index]
+    weights, bias = opt.step(cost_function, weights, X=X_batch, Y=Y_batch)
+
+    # Compute accuracy
+    emp=variational_classifier(weights,feats_train[i],classi)
+    pred[i]=int(max(zip(emp.values(), emp.keys()))[1])
+
+    current_cost = cost_function(weights, X, Y)
+
+    for i in range(len(feats_train)):
+        emp=variational_classifier(weights,feats_train[i],classi)
+        pred[i]=int(max(zip(emp.values(), emp.keys()))[1])
+    acc = accuracy(Y, pred)
+    print(f"Iter: {it+1:4d} | Cost: {current_cost:0.7f} | Accuracy: {acc:0.7f}")
+
+# weights2 = SPSA(LossFunction = lambda parameters: cost_function(parameters, feats_train, Y_train),
+#                   parameters = weights)
 
 pred=numpy.empty(len(feats_train))
 for i in range(len(feats_train)):

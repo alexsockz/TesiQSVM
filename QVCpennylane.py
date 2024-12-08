@@ -64,7 +64,7 @@ def feature_map_layer(record):
     for wires in range(dimensions):
         qml.Hadamard(wires)#applica hadamard su tutti i bit
     for wires in range(dimensions):
-        phi=2.0*(record[wires])
+        phi=(record[wires])
         qml.PhaseShift(phi, wires=wires)
     feature_map_ent("linear",record)
 
@@ -72,14 +72,14 @@ def feature_map_ent(ent, record):
     if ent=="circular":
         for wires in range(dimensions):
             prv=(wires-1)%dimensions
-            phi=2.0*(np.pi-record[prv])*(np.pi-record[wires])
+            phi=(np.pi-record[prv])*(np.pi-record[wires])
             qml.CNOT([prv, wires])
             qml.PhaseShift(phi, wires=wires)
             qml.CNOT([prv, wires])
     if ent=="linear":
         for wires in range(dimensions-1):
             nxt=(wires+1)%dimensions
-            phi=2*(np.pi-record[nxt])*(np.pi-record[wires])
+            phi=(np.pi-record[nxt])*(np.pi-record[wires])
             qml.CNOT([wires, nxt])
             qml.PhaseShift(phi, wires=nxt)
             qml.CNOT([wires, nxt])
@@ -315,7 +315,8 @@ print(feats_train)
 
 #come descritto nel paper, limito le rotazioni su Pauli Z e Y,
 #uso una lista anziche una matrice
-weights_init = 2*np.pi*np.random.random((num_layers+1)*dimensions*2,requires_grad=True) # forse non serve 
+#TODO: probabilmente i pesi iniziali sono un problema
+weights_init = np.random.random_sample((num_layers+1)*dimensions*2,requires_grad=True)-0.5 # forse non serve 
 #solo per dati binari
 #bias_init = np.array(0.0, requires_grad=True)
 
@@ -334,7 +335,7 @@ print_circuit(weights, feats_train[0])
 
 ######################## ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
 
-opt= qml.SPSAOptimizer(num_steps_spsa, alpha=0.4, c=0.5)
+opt= qml.SPSAOptimizer(num_steps_spsa,)
 
 # test=[0.294, 0.564, 0.142]
 # py=test[1]

@@ -1,12 +1,13 @@
+from sklearn.model_selection import train_test_split
 from sklearn import metrics
 import pennylane as qml
 from pennylane import numpy as np
 import numpy 
 from sklearn.preprocessing import normalize
 from math import floor
-from sklearn.model_selection import train_test_split
 
-shots=1000
+
+shots=100
 dev = qml.device("default.qubit", shots=shots)
 
 data = numpy.genfromtxt("iris2.csv",delimiter=",", dtype=str)

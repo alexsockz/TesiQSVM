@@ -39,7 +39,7 @@ print(f"Classical SVC on the test dataset:     {test_score_c4:.2f}")
 
 num_features = features.shape[1]
 
-feature_map = ZZFeatureMap(feature_dimension=num_features, reps=1)
+feature_map = ZZFeatureMap(feature_dimension=num_features, reps=1, )
 feature_map.decompose().draw(output="mpl", style="clifford", fold=20)
 
 
@@ -76,7 +76,7 @@ vqc = VQC(
 
 # clear objective value history
 objective_func_vals = []
-
+print(feature_map.decompose().draw())
 start = time.time()
 vqc.fit(train_features, train_labels)
 elapsed = time.time() - start

@@ -66,7 +66,7 @@ def feature_map_layer(record):
     for wires in range(dimensions):
         phi=(record[wires])
         qml.PhaseShift(phi, wires=wires)
-    feature_map_ent("linear",record)
+    feature_map_ent("full",record)
 
 def feature_map_ent(ent, record):
     if ent=="circular":
@@ -83,6 +83,14 @@ def feature_map_ent(ent, record):
             qml.CNOT([wires, nxt])
             qml.PhaseShift(phi, wires=nxt)
             qml.CNOT([wires, nxt])
+    if ent=="full":
+        for target in range(1,dimensions):
+            for ctrl in range(target):
+                phi=(np.pi-record[ctrl])*(np.pi-record[target])
+                qml.CNOT([ctrl, target])
+                qml.PhaseShift(phi, wires=target)
+                qml.CNOT([ctrl, target])
+
 
 @qml.qnode(dev)
 def circuit(weights, x):

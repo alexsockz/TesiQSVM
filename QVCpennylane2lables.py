@@ -4,15 +4,16 @@ from pennylane import numpy as np
 import numpy 
 from sklearn.preprocessing import normalize
 from math import floor
+import genLib as GL
 
 
-shots=100
+shots=1000
 dev = qml.device("default.qubit", shots=shots)
 
 data = numpy.genfromtxt("iris3.csv",delimiter=",", dtype=str)
 X = np.array(data[:, :-1], dtype=float)
 #REMEMBER: devo indicare il tipo della label, cerco di essere il piu generico possibile in modo da classificare anche stringhe
-Y = numpy.array(data[:, -1], dtype=int)
+Y = numpy.array(data[:, -1], dtype=float)
 
 train_perc=0.75
 num_data = len(Y)
@@ -21,83 +22,17 @@ num_layers = 4
 batch_size = 20
 num_steps_spsa =300
 
-def ansatz(weights, iterations):
-    for wire in range(dimensions):
-        qml.RZ(weights[0*dimensions+wire*2+0], wires=wire)
-        qml.RY(weights[0*dimensions+wire*2+1], wires=wire)
-
-    for layer in range(1,iterations):
-        ansatz_ent("full_swap")
-        for wire in range(dimensions):
-            qml.RZ(weights[layer*dimensions+wire*2+0], wires=wire)
-            qml.RY(weights[layer*dimensions+wire*2+1], wires=wire)
-        qml.Barrier(range(dimensions))
-
-    #da modificare in base al tipo di entanglement che vogliamo, questo è ciclico
-    
-def ansatz_ent(ent):
-    if ent=="circular":
-        for wires in range(dimensions):
-            qml.CNOT([(wires-1)%dimensions,wires]) 
-    if ent=="linear":
-        for wires in range(dimensions-1):
-            qml.CNOT([wires,wires+1]) 
-    if ent=="full_swap":
-         for i in range(dimensions-1):
-             for j in range(i,dimensions-1):
-                 qml.SWAP([i,j+1])
-
-# i dati devono essere (0,2pi]^dim
-# noi vogliamo che la feature map mappi sull'intera base di pauli Z, 
-
-# questo come possiamo notare theta viene dimezzato e quindi per poter mantenere la rotazione su 2pi è necessario compensare
-def feature_map_layer(record):
-    for wires in range(dimensions):
-        qml.Hadamard(wires)#applica hadamard su tutti i bit
-    for wires in range(dimensions):
-        phi=(record[wires])
-        qml.PhaseShift(phi, wires=wires)
-    feature_map_ent("full",record)
-
-def feature_map_ent(ent, record):
-    if ent=="circular":
-        for wires in range(dimensions):
-            prv=(wires-1)%dimensions
-            phi=(np.pi-record[prv])*(np.pi-record[wires])
-            qml.CNOT([prv, wires])
-            qml.PhaseShift(phi, wires=wires)
-            qml.CNOT([prv, wires])
-    if ent=="linear":
-        for wires in range(dimensions-1):
-            nxt=(wires+1)%dimensions
-            phi=(np.pi-record[nxt])*(np.pi-record[wires])
-            qml.CNOT([wires, nxt])
-            qml.PhaseShift(phi, wires=nxt)
-            qml.CNOT([wires, nxt])
-    if ent=="full":
-        for target in range(1,dimensions):
-            for ctrl in range(target):
-                phi=(np.pi-record[ctrl])*(np.pi-record[target])
-                qml.CNOT([ctrl, target])
-                qml.PhaseShift(phi, wires=target)
-                qml.CNOT([ctrl, target])
-
-
 @qml.qnode(dev)
 def circuit(weights, x):
     for _ in range(2):
-        feature_map_layer(x)
+        GL.feature_map_layer(x,dimensions)
         qml.Barrier(range(dimensions))
-    ansatz(weights, num_layers)
+    GL.ansatz(weights, num_layers, dimensions)
     #metodo vecchio
     # for i in range(dimensions):
     #     qml.measure(i)
     #return qml.expval(qml.PauliZ(0))
     return (qml.counts(qml.Y(0))) 
-
-def print_circuit(weights,x):
-    drawer = qml.draw(circuit)
-    print(drawer(weights, x))
 
 def variational_classifier(weights, x, labels):
 #matrice di grandezza 2^n x C, ovvero le possibili stringhe create dal circuito x il numero di classi
@@ -108,22 +43,20 @@ def variational_classifier(weights, x, labels):
     else:
         raise TypeError("x must be a 1 dim list (a data element)")
 
-#assumo data sia un multi dimensional dataset
-def normalize2pi(data):
-    return normalize(data, norm="max",axis=0)*2*np.pi
-
-#FIXME: SISTEMA
 def prob_x_div_corretto(pmf,correct, bias):
     #dobbiamo capire quale è la probabilità che il predict di x sia diverso dalla sua corretta label e minimizzarlo
-    py=pmf[correct]
-    #print(correct, pmf, py, rest)
-    num=(1+correct*bias)/2-py
+    try:
+        py=pmf[correct]
+    except:
+        print(pmf)
+        py=0
+        #print(correct, pmf, py, rest)
+    num=(0.5-(py)-((correct*bias)/2))
     den=np.sqrt(2*(1-py)*py)
     if den==0: print("errore")
     f=np.sqrt(shots)*(num)/(den+1e-10)
     p=1/(1+np.exp(-f))
     return p
-
 
 def sig_cost_function(weights, bias, X, Y):
     R_emp=0
@@ -133,12 +66,6 @@ def sig_cost_function(weights, bias, X, Y):
         R_emp+=prob_x_div_corretto(emp_distribution, y, bias)
         #print(prob_x_div_corretto(emp_distribution,y))
     return R_emp/len(X)
-
-#FIXME: non ha senso?
-def accuracy(labels, predictions):
-    acc = sum(abs(l - p) < 1e-5 for l, p in zip(labels, predictions))
-    acc = acc / len(labels)
-    return acc
 
 def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per_step):
     # Copy the initial parameters to make sure they are never overwritten
@@ -164,6 +91,7 @@ def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per
             )
             f.write(f"Step {step:3d}: Circuit executions: {exec_history[step]:4d}, "
                 f"Cost = {cost_history[step]}")
+            print(bias)
 
         # batch_index = np.random.randint(0, len(X), (batch_size,))
         # feats_train_batch = X[batch_index]
@@ -178,6 +106,12 @@ def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per
         cost_history.append(cost)
         exec_history.append((step + 1) * execs_per_step)
         step+=1
+        pred=numpy.empty(len(feats_train),dtype=int)
+        for i in range(len(feats_train)):
+            emp=variational_classifier(weights,feats_train[i],[-1,1])
+            l=int(max(zip(emp.values(), emp.keys()))[1])
+            pred[i]=l
+        print(GL.accuracy(Y_train,pred))
 
     print(
         f"Step {num_steps:3d}: Circuit executions: {exec_history[-1]:4d}, "
@@ -191,7 +125,7 @@ def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per
 ################### main ###################
 
 print("prima riga pre normalizzazione",X[0],"   ",Y[0])
-features=normalize2pi(X)
+features=GL.normalize2pi(X)
 print("prima riga post normalizzazione", features[0],"   ", Y[0])
 if num_data==len(features): print("corrette dimesioni")
 
@@ -200,9 +134,6 @@ if num_data==len(features): print("corrette dimesioni")
 feats_train, feats_val, Y_train, Y_val = train_test_split(
     features, Y, train_size=train_perc, random_state=42
 )
-
-# feats_train=features
-# Y_train=Y
 
 print(feats_train)
 
@@ -221,8 +152,10 @@ print(feats_train)
 
 #come descritto nel paper, limito le rotazioni su Pauli Z e Y,
 #uso una lista anziche una matrice
-#TODO: probabilmente i pesi iniziali sono un problema
-weights_init = np.random.random_sample((num_layers+1)*dimensions*2,requires_grad=True) # forse non serve 
+# probabilmente i pesi iniziali sono un problema
+#weights_init = np.random.random_sample((num_layers+1)*dimensions*2,requires_grad=True) # forse non serve 
+
+weights_init= np.zeros((num_layers+1)*dimensions*2,requires_grad=True)
 #solo per dati binari
 bias_init = np.array(0.0, requires_grad=True)
 
@@ -235,7 +168,7 @@ bias = bias_init
 
 ############# PRINT PER CONTROLLARE IL CIRCUITO #######################
 print(feats_train[0])
-print_circuit(weights, feats_train[0])
+GL.print_circuit(weights, feats_train[0],circuit)
 
 #input("Press Enter to continue...")
 
@@ -243,34 +176,26 @@ print_circuit(weights, feats_train[0])
 
 opt= qml.SPSAOptimizer(num_steps_spsa,)
 
-# test=[0.294, 0.564, 0.142]
-# py=test[1]
-# rest=[x for i,x in enumerate(test) if i!=1]
-# print(py)
-# print(max(rest))
-# f=np.sqrt(shots)*((max(rest)-py)/np.sqrt(2*(1-py)*py))
-# p=1/(1+np.exp(-f))
-# print(p)
-
-pred=numpy.empty(len(feats_train),dtype=str)
+pred=numpy.empty(len(feats_train),dtype=int)
 for i in range(len(feats_train)):
     emp=variational_classifier(weights,feats_train[i],[-1,1])
-    l=max(zip(emp.values(), emp.keys()))[1]
+    l=int(max(zip(emp.values(), emp.keys()))[1])
     pred[i]=l
-print(accuracy(Y_train,feats_train))
+print(pred)
+print(GL.accuracy(Y_train,pred))
 
 cost_history_spsa, exec_history_spsa, weights = run_optimizer(
 opt, sig_cost_function, [weights,bias,feats_train,Y_train], num_steps_spsa, 20, 1
 )
 
-pred=numpy.empty(len(feats_train),dtype=str)
+pred=numpy.empty(len(feats_train),dtype=int)
 for i in range(len(feats_train)):
     emp=variational_classifier(weights,feats_train[i],[-1,1])
-    l=max(zip(emp.values(), emp.keys()))[1]
+    l=int(max(zip(emp.values(), emp.keys()))[1])
     pred[i]=l
-print(accuracy(Y_train,feats_train))
-# weights = SPSA(LossFunction = lambda parameters: cross_entropy_cost(parameters, feats_train, Y_train),
-#                    parameters = weights)
+print(pred)
+print(GL.accuracy(Y_train,pred))
+
 
 # print(weights)
 

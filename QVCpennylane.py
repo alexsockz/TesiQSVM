@@ -358,7 +358,7 @@ print_circuit(weights, feats_train[0])
 
 ######################## ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
 
-opt= qml.GradientDescentOptimizer(num_steps_spsa,)
+opt= qml.SPSAOptimizer(num_steps_spsa,)
 
 # test=[0.294, 0.564, 0.142]
 # py=test[1]

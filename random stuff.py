@@ -118,3 +118,17 @@
 
 
 
+# weights = SPSA(LossFunction = lambda parameters: cross_entropy_cost(parameters, feats_train, Y_train),
+#                    parameters = weights)
+
+
+
+
+# test=[0.294, 0.564, 0.142]
+# py=test[1]
+# rest=[x for i,x in enumerate(test) if i!=1]
+# print(py)
+# print(max(rest))
+# f=np.sqrt(shots)*((max(rest)-py)/np.sqrt(2*(1-py)*py))
+# p=1/(1+np.exp(-f))
+# print(p)

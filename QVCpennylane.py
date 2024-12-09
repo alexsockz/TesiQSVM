@@ -168,15 +168,8 @@ def sig_cost_function(weights, X, Y):
         R_emp+=prob_x_div_corretto(emp_distribution,y)
         #print(prob_x_div_corretto(emp_distribution,y))
         #print(R_emp)
-<<<<<<< HEAD
-<<<<<<< HEAD
     return R_emp/len(Y)
-=======
-    return R_emp/len(X)
->>>>>>> 9042b22 (creato qvc per 2 labels ma va sistemato)
-=======
-    return R_emp/len(X)
->>>>>>> origin/momentaneo
+
 
 def old_cost(weights, bias, X, Y):
     predictions=[variational_classifier(weights, bias, x)for x in X]
@@ -194,15 +187,8 @@ def cross_entropy_cost(weights, X, Y):
             print("errore")
         R_emp-=np.log(emp_distribution[y]+1e-5)
     #loss
-<<<<<<< HEAD
-<<<<<<< HEAD
     return R_emp/len(Y)
-=======
-    return R_emp/len(X)
->>>>>>> 9042b22 (creato qvc per 2 labels ma va sistemato)
-=======
-    return R_emp/len(X)
->>>>>>> origin/momentaneo
+
 
 def accuracy(labels, predictions):
     acc = sum(abs(l - p) < 1e-5 for l, p in zip(labels, predictions))
@@ -257,11 +243,6 @@ def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per
         f"Cost = {cost_history[-1]}")
     return cost_history, exec_history, weights
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> origin/momentaneo
 def grad(L, w, ck):
      
     # number of parameters
@@ -325,11 +306,6 @@ def confusion_matrix(x, y, labels):
         pred[i]=l
     confusion_matrix = metrics.confusion_matrix(y, pred)
     return confusion_matrix
-
-<<<<<<< HEAD
->>>>>>> 9042b22 (creato qvc per 2 labels ma va sistemato)
-=======
->>>>>>> origin/momentaneo
 ################### main ###################
 
 print("prima riga pre normalizzazione",X[0],"   ",Y[0])
@@ -394,22 +370,7 @@ opt= qml.GradientDescentOptimizer(num_steps_spsa,)
 # p=1/(1+np.exp(-f))
 # print(p)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-pred=numpy.empty(len(feats_train))
-for i in range(len(feats_train)):
-    emp=variational_classifier(weights,feats_train[i],classi)
-    print(emp)
-    l=max(zip(emp.values(), emp.keys()))[1]
-    pred[i]=l
-confusion_matrix = metrics.confusion_matrix(Y_train, pred)
-print(confusion_matrix)
-=======
 confusion_matrix(feats_train,Y_train,classi)
->>>>>>> 9042b22 (creato qvc per 2 labels ma va sistemato)
-=======
-confusion_matrix(feats_train,Y_train,classi)
->>>>>>> origin/momentaneo
 
 cost_history_spsa, exec_history_spsa, weights = run_optimizer(
 opt, cross_entropy_cost, [weights,feats_train,Y_train], num_steps_spsa, 20, 1
@@ -419,21 +380,6 @@ opt, cross_entropy_cost, [weights,feats_train,Y_train], num_steps_spsa, 20, 1
 #                    parameters = weights)
 
 confusion_matrix(feats_train,Y_train,classi)
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-pred=numpy.empty(len(feats_train))
-for i in range(len(feats_train)):
-    emp=variational_classifier(weights,feats_train[i],classi)
-    print(emp)
-    pred[i]=int(max(zip(emp.values(), emp.keys()))[1])
-print(accuracy(Y_train,pred))
-=======
-confusion_matrix(feats_train,Y_train,classi)
-
->>>>>>> 9042b22 (creato qvc per 2 labels ma va sistemato)
-=======
->>>>>>> origin/momentaneo
 
 # print(weights)
 

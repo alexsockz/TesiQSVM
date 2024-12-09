@@ -88,7 +88,9 @@ def circuit(weights, x):
 
 
 def variational_classifier(weights, bias, x):
-    return circuit(weights, x) + bias
+    r=circuit(weights, x)
+    print(r)
+    return r + bias
 
 def cost(weights, bias, X, Y):
     # Transpose the batch of input data in order to make the indexing

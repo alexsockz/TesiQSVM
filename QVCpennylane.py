@@ -19,7 +19,7 @@ train_perc=0.75
 num_data = len(Y)
 dimensions = len(X[0])
 num_layers = 4
-batch_size = 5
+batch_size = 20
 max_iterations=60
 num_steps_spsa =300
 
@@ -168,7 +168,7 @@ def sig_cost_function(weights, X, Y):
         R_emp+=prob_x_div_corretto(emp_distribution,y)
         #print(prob_x_div_corretto(emp_distribution,y))
         #print(R_emp)
-    return R_emp/num_data
+    return R_emp/len(X)
 
 def old_cost(weights, bias, X, Y):
     predictions=[variational_classifier(weights, bias, x)for x in X]
@@ -186,7 +186,7 @@ def cross_entropy_cost(weights, X, Y):
             print("errore")
         R_emp-=np.log(emp_distribution[y]+1e-5)
     #loss
-    return R_emp/num_data
+    return R_emp/len(X)
 
 def accuracy(labels, predictions):
     acc = sum(abs(l - p) < 1e-5 for l, p in zip(labels, predictions))
@@ -219,8 +219,13 @@ def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per
             f.write(f"Step {step:3d}: Circuit executions: {exec_history[step]:4d}, "
                 f"Cost = {cost_history[step]}")
 
+        # batch_index = np.random.randint(0, len(X), (batch_size,))
+        # feats_train_batch = X[batch_index]
+        # Y_train_batch = Y[batch_index]
         # Perform an update step
-        weights,_,_ = opt.step(cost_function, weights, X,Y)
+        # weights, _, _ = opt.step(cost_function, weights, feats_train_batch, Y_train_batch)
+
+        weights, _, _ = opt.step(cost_function, weights, X, Y)
         #print(weights)
         # Monitor the cost value
         cost=cost_function(weights,X,Y)
@@ -290,6 +295,16 @@ def SPSA(LossFunction, parameters, alpha=0.602, gamma=0.101, N_iterations=10):
         w -= ak*gk
  
     return w
+
+def confusion_matrix(x, y, labels):
+    pred=numpy.empty(len(x),dtype=str)
+    for i in range(len(x)):
+        emp=variational_classifier(weights,x[i],labels)
+        l=max(zip(emp.values(), emp.keys()))[1]
+        pred[i]=l
+    confusion_matrix = metrics.confusion_matrix(y, pred)
+    return confusion_matrix
+
 ################### main ###################
 
 print("prima riga pre normalizzazione",X[0],"   ",Y[0])
@@ -343,7 +358,7 @@ print_circuit(weights, feats_train[0])
 
 ######################## ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
 
-opt= qml.SPSAOptimizer(num_steps_spsa,)
+opt= qml.GradientDescentOptimizer(num_steps_spsa,)
 
 # test=[0.294, 0.564, 0.142]
 # py=test[1]
@@ -354,13 +369,7 @@ opt= qml.SPSAOptimizer(num_steps_spsa,)
 # p=1/(1+np.exp(-f))
 # print(p)
 
-pred=numpy.empty(len(feats_train),dtype=str)
-for i in range(len(feats_train)):
-    emp=variational_classifier(weights,feats_train[i],classi)
-    l=max(zip(emp.values(), emp.keys()))[1]
-    pred[i]=l
-confusion_matrix = metrics.confusion_matrix(Y_train, pred)
-print(confusion_matrix)
+confusion_matrix(feats_train,Y_train,classi)
 
 cost_history_spsa, exec_history_spsa, weights = run_optimizer(
 opt, cross_entropy_cost, [weights,feats_train,Y_train], num_steps_spsa, 20, 1
@@ -369,13 +378,7 @@ opt, cross_entropy_cost, [weights,feats_train,Y_train], num_steps_spsa, 20, 1
 # weights = SPSA(LossFunction = lambda parameters: cross_entropy_cost(parameters, feats_train, Y_train),
 #                    parameters = weights)
 
-pred=numpy.empty(len(feats_train),dtype=str)
-for i in range(len(feats_train)):
-    emp=variational_classifier(weights,feats_train[i],classi)
-    l=max(zip(emp.values(), emp.keys()))[1]
-    pred[i]=l
-confusion_matrix = metrics.confusion_matrix(Y_train, pred)
-print(confusion_matrix)
+confusion_matrix(feats_train,Y_train,classi)
 
 
 # print(weights)

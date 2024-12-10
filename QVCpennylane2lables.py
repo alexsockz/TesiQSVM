@@ -208,7 +208,7 @@ for i in range(10):
 
 
     cost_history, exec_history, accuracy_train_history, accuracy_val_history, weights, bias = run_optimizer(
-    opt, sig_cost_function, [weights,bias,feats_train,Y_train], feats_val,Y_val, num_steps_spsa, 20, 1
+    opt, sig_cost_function, [weights,bias,feats_train,Y_train], feats_val,Y_val, num_steps_spsa, 20, 2
     )
 
     a= list(zip(exec_history, cost_history, accuracy_train_history, accuracy_val_history))

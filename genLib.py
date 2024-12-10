@@ -1,9 +1,6 @@
-from sklearn.model_selection import train_test_split
 import pennylane as qml
 from pennylane import numpy as np
-import numpy 
 from sklearn.preprocessing import normalize
-from math import floor
 
 #da modificare in base al tipo di entanglement che vogliamo, questo è ciclico
 def ansatz(weights, iterations, dimensions):

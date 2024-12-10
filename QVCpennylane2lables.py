@@ -2,9 +2,8 @@ from sklearn.model_selection import train_test_split
 import pennylane as qml
 from pennylane import numpy as np
 import numpy 
-from sklearn.preprocessing import normalize
-from math import floor
 import genLib as GL
+import csv
 
 
 shots=1000
@@ -67,17 +66,37 @@ def sig_cost_function(weights, bias, X, Y):
         #print(prob_x_div_corretto(emp_distribution,y))
     return R_emp/len(X)
 
-def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per_step):
+
+def predict(X, weights):
+    pred=numpy.empty(len(X),dtype=int)
+    for i in range(len(X)):
+        emp=variational_classifier(weights,X[i],[-1,1])
+        l=int(max(zip(emp.values(), emp.keys()))[1])
+        pred[i]=l
+    return pred
+
+def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, interval, execs_per_step):
     # Copy the initial parameters to make sure they are never overwritten
     weights, bias, X, Y = init_param.copy()
 
     # Initialize the memory for cost values during the optimization
     cost_history = []
+    accuracy_train_history=[]
+    accuracy_val_history=[]
     # Monitor the initial cost value
     cost=cost_function(weights,bias, X,Y)
     cost_history.append(cost)
     exec_history = [0]
-    f=open('dump.txt', 'w')
+    pred_train=predict(X,weights)
+    accuracy_train=GL.accuracy(Y_train,pred_train)
+    
+    accuracy_train_history.append(accuracy_train)
+
+    pred_val=predict(feats_val,weights)
+    accuracy_val=GL.accuracy(Y_val,pred_val)
+    
+    accuracy_val_history.append(accuracy_val)
+
     print(
         f"\nRunning the {opt.__class__.__name__} optimizer for {num_steps} iterations."
     )
@@ -89,9 +108,11 @@ def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per
                 f"Step {step:3d}: Circuit executions: {exec_history[step]:4d}, "
                 f"Cost = {cost_history[step]}"
             )
-            f.write(f"Step {step:3d}: Circuit executions: {exec_history[step]:4d}, "
-                f"Cost = {cost_history[step]}")
             print(bias)
+            print(
+                f"Step {step:3d}: Circuit executions: {exec_history[step]:4d}, "
+                f"accuracy = {accuracy_train_history[step]}"
+            )
 
         # batch_index = np.random.randint(0, len(X), (batch_size,))
         # feats_train_batch = X[batch_index]
@@ -105,6 +126,16 @@ def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per
         cost=cost_function(weights, bias, X,Y)
         cost_history.append(cost)
         exec_history.append((step + 1) * execs_per_step)
+
+        pred_train=predict(X,weights)
+        accuracy_train=GL.accuracy(Y_train,pred_train)
+        
+        accuracy_train_history.append(accuracy_train)
+
+        pred_val=predict(feats_val,weights)
+        accuracy_val=GL.accuracy(Y_val,pred_val)
+        
+        accuracy_val_history.append(accuracy_val)
         step+=1
         pred=numpy.empty(len(feats_train),dtype=int)
         for i in range(len(feats_train)):
@@ -113,13 +144,12 @@ def run_optimizer(opt, cost_function, init_param, num_steps, interval, execs_per
             pred[i]=l
         print(GL.accuracy(Y_train,pred))
 
+
     print(
         f"Step {num_steps:3d}: Circuit executions: {exec_history[-1]:4d}, "
         f"Cost = {cost_history[-1]}"
     )
-    f.write(f"Step {num_steps:3d}: Circuit executions: {exec_history[-1]:4d}, "
-        f"Cost = {cost_history[-1]}")
-    return cost_history, exec_history, weights
+    return cost_history, exec_history, accuracy_train_history, accuracy_val_history, weights, bias
 
 
 ################### main ###################
@@ -130,73 +160,59 @@ print("prima riga post normalizzazione", features[0],"   ", Y[0])
 if num_data==len(features): print("corrette dimesioni")
 
 #suddivisione 
+for i in range(10):
+    feats_train, feats_val, Y_train, Y_val = train_test_split(
+        features, Y, train_size=train_perc
+    )
 
-feats_train, feats_val, Y_train, Y_val = train_test_split(
-    features, Y, train_size=train_perc, random_state=42
-)
-
-print(feats_train)
-
-
-#in caso serva in futuro avere, per qualche mappatura particolare
-#occurrences_Y=Counter(Y_train)
-
-#dipende dai dati
-#Y = Y * 2 - 1  # shift label from {0, 1} to {-1, 1}
-
-# print tutti i dati
-# for x,y in zip(X, Y):
-#     print(f"x = {x}, y = {y}")        
-
-########## setup pesi ##########
-
-#come descritto nel paper, limito le rotazioni su Pauli Z e Y,
-#uso una lista anziche una matrice
-# probabilmente i pesi iniziali sono un problema
-#weights_init = np.random.random_sample((num_layers+1)*dimensions*2,requires_grad=True) # forse non serve 
-
-weights_init= np.zeros((num_layers+1)*dimensions*2,requires_grad=True)
-#solo per dati binari
-bias_init = np.array(0.0, requires_grad=True)
-
-print("Weights:", weights_init)
-print("Bias: ", bias_init)
-
-weights = weights_init
-bias = bias_init
+    print(feats_train)
 
 
-############# PRINT PER CONTROLLARE IL CIRCUITO #######################
-print(feats_train[0])
-GL.print_circuit(weights, feats_train[0],circuit)
+    #in caso serva in futuro avere, per qualche mappatura particolare
+    #occurrences_Y=Counter(Y_train)
 
-#input("Press Enter to continue...")
+    #dipende dai dati
+    #Y = Y * 2 - 1  # shift label from {0, 1} to {-1, 1}
 
-######################## ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
+    # print tutti i dati
+    # for x,y in zip(X, Y):
+    #     print(f"x = {x}, y = {y}")        
 
-opt= qml.SPSAOptimizer(num_steps_spsa,)
+    ########## setup pesi ##########
 
-pred=numpy.empty(len(feats_train),dtype=int)
-for i in range(len(feats_train)):
-    emp=variational_classifier(weights,feats_train[i],[-1,1])
-    l=int(max(zip(emp.values(), emp.keys()))[1])
-    pred[i]=l
-print(pred)
-print(GL.accuracy(Y_train,pred))
+    #come descritto nel paper, limito le rotazioni su Pauli Z e Y,
+    #uso una lista anziche una matrice
+    # probabilmente i pesi iniziali sono un problema
+    #weights_init = np.random.random_sample((num_layers+1)*dimensions*2,requires_grad=True) # forse non serve 
 
-cost_history_spsa, exec_history_spsa, weights = run_optimizer(
-opt, sig_cost_function, [weights,bias,feats_train,Y_train], num_steps_spsa, 20, 1
-)
+    weights_init= np.zeros((num_layers+1)*dimensions*2,requires_grad=True)
+    #solo per dati binari
+    bias_init = np.array(0.0, requires_grad=True)
 
-pred=numpy.empty(len(feats_train),dtype=int)
-for i in range(len(feats_train)):
-    emp=variational_classifier(weights,feats_train[i],[-1,1])
-    l=int(max(zip(emp.values(), emp.keys()))[1])
-    pred[i]=l
-print(pred)
-print(GL.accuracy(Y_train,pred))
+    print("Weights:", weights_init)
+    print("Bias: ", bias_init)
+
+    weights = weights_init
+    bias = bias_init
 
 
-# print(weights)
+    ############# PRINT PER CONTROLLARE IL CIRCUITO #######################
+    print(feats_train[0])
+    GL.print_circuit(weights, feats_train[0],circuit)
 
-# print(weights==weights2)
+    #input("Press Enter to continue...")
+
+    ######################## ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
+
+    opt= qml.SPSAOptimizer(num_steps_spsa,)
+
+
+    cost_history, exec_history, accuracy_train_history, accuracy_val_history, weights, bias = run_optimizer(
+    opt, sig_cost_function, [weights,bias,feats_train,Y_train], feats_val,Y_val, num_steps_spsa, 20, 1
+    )
+
+    a= list(zip(exec_history, cost_history, accuracy_train_history, accuracy_val_history))
+    numpy.savetxt("data"+str(i)+".csv",a, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f'], header="exec_history,cost_history,accuracy_train_history,accuracy_val_history")
+    # print(weights)
+
+    # print(weights==weights2)

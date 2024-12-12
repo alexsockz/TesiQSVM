@@ -4,7 +4,7 @@ from pennylane import numpy as np
 import numpy 
 import genLib as GL
 import csv
-
+from sklearn.metrics import roc_auc_score, accuracy_score
 
 shots=1000
 dev = qml.device("default.qubit", shots=shots)
@@ -66,36 +66,48 @@ def sig_cost_function(weights, bias, X, Y):
         #print(prob_x_div_corretto(emp_distribution,y))
     return R_emp/len(X)
 
-
 def predict(X, weights):
-    pred=numpy.empty(len(X),dtype=int)
-    for i in range(len(X)):
-        emp=variational_classifier(weights,X[i],[-1,1])
-        l=int(max(zip(emp.values(), emp.keys()))[1])
-        pred[i]=l
-    return pred
+    pred=numpy.empty(0,dtype=int)
+    emp_distr_list=numpy.empty(0, dtype=dict)
+    for x in X:
+        samples=variational_classifier(weights,x, [-1,1])
+        emp_distribution= {k:v/shots for k,v in samples.items()}
+        l=int(max(zip(emp_distribution.values(), emp_distribution.keys()))[1])
+        pred=numpy.append(pred,l)
+        emp_distr_list=numpy.append(emp_distr_list,emp_distribution)
+
+    return pred, emp_distr_list
+
+def scores(cost_function, weights,bias,X,Y,feats_val,Y_val):
+
+    cost=cost_function(weights, bias, X,Y)
+
+    pred_train, emp_train=predict(X,weights)
+
+    accuracy_train=accuracy_score(Y,pred_train)
+    p_pos_train=[i[1] for i in emp_train]
+    auc_train=roc_auc_score(Y,p_pos_train)
+
+
+    pred_val, emp_val=predict(feats_val,weights)
+
+    accuracy_val=accuracy_score(Y_val,pred_val)
+    p_pos_val=[i[1] for i in emp_val]
+    auc_val=roc_auc_score(Y_val,p_pos_val)
+
+    print("accuracy: ",accuracy_train," ", acc_prova," auc: ",auc_train)
+
+    return [cost,accuracy_train,auc_train,accuracy_val,auc_val]
 
 def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, interval, execs_per_step):
     # Copy the initial parameters to make sure they are never overwritten
     weights, bias, X, Y = init_param.copy()
 
     # Initialize the memory for cost values during the optimization
-    cost_history = []
-    accuracy_train_history=[]
-    accuracy_val_history=[]
+    history=[]
     # Monitor the initial cost value
-    cost=cost_function(weights,bias, X,Y)
-    cost_history.append(cost)
-    exec_history = [0]
-    pred_train=predict(X,weights)
-    accuracy_train=GL.accuracy(Y_train,pred_train)
     
-    accuracy_train_history.append(accuracy_train)
-
-    pred_val=predict(feats_val,weights)
-    accuracy_val=GL.accuracy(Y_val,pred_val)
-    
-    accuracy_val_history.append(accuracy_val)
+    history.append([0]+scores(cost_function,weights,bias,X,Y,feats_val,Y_val))
 
     print(
         f"\nRunning the {opt.__class__.__name__} optimizer for {num_steps} iterations."
@@ -105,13 +117,13 @@ def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, in
         # Print out the status of the optimization
         if step % 10 == 0:
             print(
-                f"Step {step:3d}: Circuit executions: {exec_history[step]:4d}, "
-                f"Cost = {cost_history[step]}"
+                f"Step {step:3d}: Circuit executions: {history[step][0]:4d}, "
+                f"Cost = {history[step][1]}"
             )
             print(bias)
             print(
-                f"Step {step:3d}: Circuit executions: {exec_history[step]:4d}, "
-                f"accuracy = {accuracy_train_history[step]}"
+                f"Step {step:3d}: Circuit executions: {history[step][0]:4d}, "
+                f"accuracy = {history[step][2]}"
             )
 
         # batch_index = np.random.randint(0, len(X), (batch_size,))
@@ -123,33 +135,24 @@ def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, in
         weights, bias, _, _ = opt.step(cost_function, weights, bias, X, Y)
         #print(weights)
         # Monitor the cost value
-        cost=cost_function(weights, bias, X,Y)
-        cost_history.append(cost)
-        exec_history.append((step + 1) * execs_per_step)
-
-        pred_train=predict(X,weights)
-        accuracy_train=GL.accuracy(Y_train,pred_train)
         
-        accuracy_train_history.append(accuracy_train)
+        history.append([(step + 1) * execs_per_step]+scores(cost_function,weights,bias,X,Y,feats_val,Y_val))
 
-        pred_val=predict(feats_val,weights)
-        accuracy_val=GL.accuracy(Y_val,pred_val)
-        
-        accuracy_val_history.append(accuracy_val)
         step+=1
-        pred=numpy.empty(len(feats_train),dtype=int)
-        for i in range(len(feats_train)):
-            emp=variational_classifier(weights,feats_train[i],[-1,1])
-            l=int(max(zip(emp.values(), emp.keys()))[1])
-            pred[i]=l
-        print(GL.accuracy(Y_train,pred))
+        # pred=numpy.empty(len(feats_train),dtype=int)
+        # for i in range(len(feats_train)):
+        #     emp=variational_classifier(weights,feats_train[i],[-1,1])
+        #     l=int(max(zip(emp.values(), emp.keys()))[1])
+        #     pred[i]=l
+        # print(GL.accuracy(Y,pred))
+        # print(auc_train)
 
 
     print(
-        f"Step {num_steps:3d}: Circuit executions: {exec_history[-1]:4d}, "
-        f"Cost = {cost_history[-1]}"
+        f"Step {num_steps:3d}: Circuit executions: {history[-1][0]:4d}, "
+        f"Cost = {history[-1][1]}"
     )
-    return cost_history, exec_history, accuracy_train_history, accuracy_val_history, weights, bias
+    return history, weights, bias
 
 
 ################### main ###################
@@ -206,13 +209,12 @@ for i in range(10):
 
     opt= qml.SPSAOptimizer(num_steps_spsa,)
 
-
-    cost_history, exec_history, accuracy_train_history, accuracy_val_history, weights, bias = run_optimizer(
-    opt, sig_cost_function, [weights,bias,feats_train,Y_train], feats_val,Y_val, num_steps_spsa, 20, 2
+    history, weights, bias = run_optimizer(
+    opt, sig_cost_function, [weights,bias,feats_train,Y_train], feats_val,Y_val, num_steps_spsa, 20, 1
     )
 
-    a= list(zip(exec_history, cost_history, accuracy_train_history, accuracy_val_history))
-    numpy.savetxt("data"+str(i)+".csv",a, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f'], header="exec_history,cost_history,accuracy_train_history,accuracy_val_history")
+    
+    numpy.savetxt("data"+str(i)+".csv",history, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f'], header="iter,cost,accuracy_train,auc_train,accuracy_val,auc_val")
     # print(weights)
 
     # print(weights==weights2)

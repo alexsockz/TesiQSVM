@@ -75,11 +75,40 @@ def normalize2pi(data):
     return norm
 
 #da sistemare, non ha senso?
-def accuracy(labels, predictions):
+def accuracy(correct, predictions):
     acc=0
-    for l, p in zip(labels, predictions):
+    for l, p in zip(correct, predictions):
         if l==p:  
             acc +=1
-    acc = acc / len(labels)
+    acc = acc / len(correct)
     return acc
+
+#NOTE: è SOLO PER IL CASO BINARIO
+def precision_recall(correct,predictions):
+    tp=0
+    fp=0
+    fn=0
+    tn=0
+    for c,p in zip(correct, predictions):
+        if c==p and c==1:
+            tp=tp+1
+        elif c!=p and c==1:
+            fp=fp+1
+        elif c!=p and c!=1:
+            fn=fn+1
+        elif c==p and c!=1:
+            tn=tn+1
+    return [tp/(tp+fp), tn/(tn+fn)], [tp/(tp+fn), tn/(tn+fp)]
+
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve
+def plot_roc_curve(true_y, y_prob):
+    """
+    plots the roc curve based of the probabilities
+    """
+
+    fpr, tpr, thresholds = roc_curve(true_y, y_prob)
+    plt.plot(fpr, tpr)
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
 

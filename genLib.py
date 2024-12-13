@@ -71,7 +71,6 @@ def print_circuit(weights,x,circuit):
 #assumo data sia un multi dimensional dataset
 def normalize2pi(data):
     norm= normalize(data, norm="l2",axis=0)
-    print(norm)
     return norm
 
 #da sistemare, non ha senso?

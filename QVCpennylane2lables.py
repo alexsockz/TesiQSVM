@@ -20,6 +20,7 @@ dimensions = len(X[0])
 num_layers = 4
 batch_size = 20
 num_steps_spsa =300
+COST_WITH_BIAS=False
 
 @qml.qnode(dev)
 def circuit(weights, x):
@@ -66,6 +67,22 @@ def sig_cost_function(weights, bias, X, Y):
         #print(prob_x_div_corretto(emp_distribution,y))
     return R_emp/len(X)
 
+def cross_entropy_cost(weights, X, Y):
+    R_emp=0
+    for x,y in zip(X,Y):
+        samples=variational_classifier(weights,x, [-1,1])
+        emp_distribution= {k:v/shots for k,v in samples.items()}
+        R_emp+=cross_entropy_loss(emp_distribution, y)
+        
+    return R_emp/len(X)
+
+def cross_entropy_loss(emp_distribution, y):
+# https://scikit-learn.org/stable/modules/generated/sklearn.metrics.log_loss.html
+        corrected_label= (y+1)/2
+        p_1=emp_distribution[1]
+        return -(((corrected_label)*np.log(p_1))+((1-corrected_label)*np.log(1-p_1)))
+
+
 def predict(X, weights):
     pred=numpy.empty(0,dtype=int)
     emp_distr_list=numpy.empty(0, dtype=dict)
@@ -78,10 +95,12 @@ def predict(X, weights):
 
     return pred, emp_distr_list
 
-def scores(cost_function, weights,bias,X,Y,feats_val,Y_val):
-
-    cost=cost_function(weights, bias, X,Y)
-
+def scores(cost_function, weights, X,Y,feats_val,Y_val, bias=None):
+    if bias == None:
+        cost=cost_function(weights, X, Y)
+    else:
+        cost=cost_function(weights, bias, X, Y)
+        
     pred_train, emp_train=predict(X,weights)
 
     accuracy_train=accuracy_score(Y,pred_train)
@@ -92,22 +111,27 @@ def scores(cost_function, weights,bias,X,Y,feats_val,Y_val):
     pred_val, emp_val=predict(feats_val,weights)
 
     accuracy_val=accuracy_score(Y_val,pred_val)
+    
     p_pos_val=[i[1] for i in emp_val]
+    #print(emp_val[0],p_pos_val[0], pred_val[0])
     auc_val=roc_auc_score(Y_val,p_pos_val)
 
-    print("accuracy: ",accuracy_train," ", acc_prova," auc: ",auc_train)
+    print("accuracy: ",accuracy_train," auc: ",auc_train)
 
     return [cost,accuracy_train,auc_train,accuracy_val,auc_val]
 
 def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, interval, execs_per_step):
     # Copy the initial parameters to make sure they are never overwritten
-    weights, bias, X, Y = init_param.copy()
-
-    # Initialize the memory for cost values during the optimization
     history=[]
+    if len(init_param)==3:
+        weights, X_param, Y_param = init_param.copy()
+        history.append([0]+scores(cost_function,weights,X_param,Y_param,feats_val,Y_val))
+    elif len(init_param)==4:
+        weights, bias, X_param, Y_param = init_param.copy()
+        history.append([0]+scores(cost_function,weights,bias,X_param,Y_param,feats_val,Y_val))
+    # Initialize the memory for cost values during the optimization
     # Monitor the initial cost value
     
-    history.append([0]+scores(cost_function,weights,bias,X,Y,feats_val,Y_val))
 
     print(
         f"\nRunning the {opt.__class__.__name__} optimizer for {num_steps} iterations."
@@ -120,7 +144,7 @@ def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, in
                 f"Step {step:3d}: Circuit executions: {history[step][0]:4d}, "
                 f"Cost = {history[step][1]}"
             )
-            print(bias)
+            #print(bias)
             print(
                 f"Step {step:3d}: Circuit executions: {history[step][0]:4d}, "
                 f"accuracy = {history[step][2]}"
@@ -131,12 +155,12 @@ def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, in
         # Y_train_batch = Y[batch_index]
         # Perform an update step
         # weights, _, _ = opt.step(cost_function, weights, feats_train_batch, Y_train_batch)
-
-        weights, bias, _, _ = opt.step(cost_function, weights, bias, X, Y)
-        #print(weights)
-        # Monitor the cost value
-        
-        history.append([(step + 1) * execs_per_step]+scores(cost_function,weights,bias,X,Y,feats_val,Y_val))
+        if len(init_param)==3:
+            weights, _, _ = opt.step(cost_function, weights, X_param, Y_param)
+            history.append([(step + 1) * execs_per_step]+scores(cost_function,weights, X_param, Y_param, feats_val, Y_val))
+        elif len(init_param)==4:
+            weights, bias, _, _ = opt.step(cost_function, weights, bias, X_param, Y_param)
+            history.append([(step + 1) * execs_per_step]+scores(cost_function, weights, bias, X_param, Y_param, feats_val, Y_val))
 
         step+=1
         # pred=numpy.empty(len(feats_train),dtype=int)
@@ -152,7 +176,7 @@ def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, in
         f"Step {num_steps:3d}: Circuit executions: {history[-1][0]:4d}, "
         f"Cost = {history[-1][1]}"
     )
-    return history, weights, bias
+    return history, weights
 
 
 ################### main ###################
@@ -162,13 +186,13 @@ features=GL.normalize2pi(X)
 print("prima riga post normalizzazione", features[0],"   ", Y[0])
 if num_data==len(features): print("corrette dimesioni")
 
+print(len(features))
+
 #suddivisione 
-for i in range(10):
+for i in range(30):
     feats_train, feats_val, Y_train, Y_val = train_test_split(
         features, Y, train_size=train_perc
     )
-
-    print(feats_train)
 
 
     #in caso serva in futuro avere, per qualche mappatura particolare
@@ -192,8 +216,8 @@ for i in range(10):
     #solo per dati binari
     bias_init = np.array(0.0, requires_grad=True)
 
-    print("Weights:", weights_init)
-    print("Bias: ", bias_init)
+    # print("Weights:", weights_init)
+    # print("Bias: ", bias_init)
 
     weights = weights_init
     bias = bias_init
@@ -208,10 +232,14 @@ for i in range(10):
     ######################## ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
 
     opt= qml.SPSAOptimizer(num_steps_spsa,)
-
-    history, weights, bias = run_optimizer(
-    opt, sig_cost_function, [weights,bias,feats_train,Y_train], feats_val,Y_val, num_steps_spsa, 20, 1
-    )
+    if COST_WITH_BIAS == False:
+        history, weights = run_optimizer(
+        opt, cross_entropy_cost, [weights,feats_train,Y_train], feats_val,Y_val, num_steps_spsa, 20, 1
+        )
+    elif COST_WITH_BIAS == True:
+        history, weights = run_optimizer(
+        opt, sig_cost_function, [weights,feats_train,Y_train], feats_val,Y_val, num_steps_spsa, 20, 1
+        )
 
     
     numpy.savetxt("data"+str(i)+".csv",history, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f'], header="iter,cost,accuracy_train,auc_train,accuracy_val,auc_val")

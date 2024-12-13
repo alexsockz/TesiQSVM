@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from screeninfo import get_monitors
-
+import os, os.path
 from sys import exit
 
 MAX_LINE_WIDTH=0.5
@@ -12,7 +12,7 @@ def event(event):
     #print(event.key)
     if event.key=='left':
         i= i-1
-    if event.key=="right":
+    elif event.key=="right":
         i= i+1
     else: 
         print(event.key)
@@ -20,11 +20,11 @@ def event(event):
 
     if inp==1:
         plot_exec1(i)
-    elif inp==2:
+    else:
         plot_exec2(i)
 
 def plot_exec1(i):
-    data = np.loadtxt("C:\AAAAvscode\TesiQSVM\dati\exec1\\data"+str(i%10)+".csv", delimiter=",")
+    data = np.loadtxt("C:\AAAAFolderVsCode\TesiQSVM\dati\exec1\data"+str(i%10)+".csv", delimiter=",")
     X=data[:,0]
 
     cost=data[:,1]
@@ -59,7 +59,7 @@ def plot_exec1(i):
     # figManager.window.showMaximized()
 
 def plot_exec2(i):
-    data = np.loadtxt("C:\AAAAvscode\TesiQSVM\dati\exec2\\data"+str(i%10)+".csv", delimiter=",")
+    data = np.loadtxt("C:\AAAAFolderVsCode\TesiQSVM\dati\exec2\data"+str(i%10)+".csv", delimiter=",")
     #iter,cost,accuracy_train,auc_train,accuracy_val,auc_val
     X=data[:,0]
     cost=data[:,1]
@@ -72,7 +72,7 @@ def plot_exec2(i):
     ax2.clear()
     ax3.clear()
 
-    ax2.set_title("iterazione "+str(i%10))
+    ax2.set_title("iterazione "+str(i%10)+" esecuzione "+str(inp))
 
     ax.plot(X,cost,c="yellow",linewidth=DATA_LINE_WIDTH)
 
@@ -105,7 +105,7 @@ if inp==1:
     ax2=fig.add_axes(rect=(1/8,4/8, 6/8,3/8),fc="gray")
 
     plot_exec1(i)
-elif inp==2:
+elif type(inp) is int:
     ax3=fig.add_axes(rect=(1/8,1/11, 6/8,3/11),fc="gray")
     ax=fig.add_axes(rect=(1/8,4/11, 6/8,3/11),fc="gray")
     ax2=fig.add_axes(rect=(1/8,7/11, 6/8,3/11),fc="gray")

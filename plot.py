@@ -96,6 +96,8 @@ def plot_exec2(directory,i):
     legend_acc= ax2.legend([training_acc_handler,val_acc_handler],labels=["training accuracy","valuation accuracy"])
     legend_acc.set_loc('lower right')
 
+    legend_cost = ax.legend(labels=["cost function"])
+    legend_cost.set_loc('lower right')
     legend_auc= ax3.legend([training_acc_handler,val_acc_handler],labels=["training ROC auc","valuation ROC auc"])
     legend_auc.set_loc('lower right')
 

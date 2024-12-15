@@ -1,13 +1,8 @@
-from sklearn.metrics import roc_auc_score, accuracy_score
-from sklearn.model_selection import train_test_split
 import pennylane as qml
 from pennylane import numpy as np
 import numpy 
-import genLib as GL
-import multiprocessing as mp
-shots=1000
-dev = qml.device("default.qubit", shots=shots)
 
+SHOTS=1000
 data = numpy.genfromtxt("iris3.csv",delimiter=",", dtype=str)
 X = np.array(data[:, :-1], dtype=float)
 #REMEMBER: devo indicare il tipo della label, cerco di essere il piu generico possibile in modo da classificare anche stringhe
@@ -21,7 +16,7 @@ BATCH_SIZE = 20
 NUM_STEPS_SPSA =300
 COST_WITH_BIAS=True
 
-################# NECESSARI PER THREAD ###########################################
+dev = qml.device("lightning.qubit", shots=SHOTS, wires=DIMENSIONS)
 @qml.qnode(dev)
 def circuit(weights, x):
     for _ in range(2):
@@ -34,6 +29,15 @@ def circuit(weights, x):
     #return qml.expval(qml.PauliZ(0))
     return (qml.counts(qml.Y(0))) 
 
+################# GLI IMPORT DEVONO STARE DOPO LA DICHIARAZIONE DEL CIRCUITO PER QUALCHE MOTIVO ###########################################
+from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.model_selection import train_test_split
+import genLib as GL
+import multiprocessing as mp
+from math import ceil
+import time
+
+################# NECESSARI PER THREAD ###########################################
 def variational_classifier(weights, x, labels):
 #matrice di grandezza 2^n x C, ovvero le possibili stringhe create dal circuito x il numero di classi
 #utilizzo in realtà un array di dizionari perchè piu universale, cosi non sono limitato a numeri da 0 a C come etichette
@@ -47,7 +51,7 @@ def get_sample_emp_distribution(weights,x):
         #equivalente nella cross entropy, consulto il circuito R volte e alcune volte ritorna -1 altre 1
         samples=variational_classifier(weights,x, [-1,1])
         #\ calcolo la distribuzione di probabilità che sia 1 o -1
-        return {k:v/shots for k,v in samples.items()}
+        return {k:v/SHOTS for k,v in samples.items()}
 
 def prob_x_div_corretto(pmf,correct, bias):
     #dobbiamo capire quale è la probabilità che il predict di x sia diverso dalla sua corretta label e minimizzarlo
@@ -57,7 +61,7 @@ def prob_x_div_corretto(pmf,correct, bias):
     try:
         #qui prendo la probabilità che sia la label corretta secondo il dataset
         py=pmf[correct]
-    except:
+    except IndexError:
         #se il circuito per puro caso ritorna un dict della forma {-1:#} o {1:#} allora 
         # rischia di esserci un IndexOutOfBounds, in tal caso semplicemente so che la prob è 0
         print(pmf)
@@ -66,42 +70,44 @@ def prob_x_div_corretto(pmf,correct, bias):
     num=(0.5-(py)-((correct*bias)/2)) #numeratore
     den=np.sqrt(2*(1-py)*py) #denominatore
     
-    f=np.sqrt(shots)*(num)/(den+1e-10) #1e-10 serve per evitare un divBy0 error
+    f=np.sqrt(SHOTS)*(num)/(den+1e-10) #1e-10 serve per evitare un divBy0 error
     p=1/(1+np.exp(-f)) #sigmoide della funzione 
     return p
 
 
 def sig_cost_function_process_multithread(weights, bias, X, Y):
-    q = mp.Queue()
-    conn1, conn2 = mp.Pipe()
-    adder_process = mp.Process(target=cost_calculator, args=(q,conn2, NUM_DATA))
-    p= mp.Pool()
-    p.apply(lambda x,y :sig_cost_worker(q,weights,bias,x,y), zip(X,Y))
-    adder_process.start()
-    R_emp = conn1.recv()
-    p.join()
-    adder_process.join()
-    return R_emp
+    TOT_CORES= mp.cpu_count()
+    chunks=ceil(NUM_DATA/TOT_CORES)
 
-def cost_calculator(queue,pipe_cooenction, total):
+    queue = mp.Queue(maxsize=TOT_CORES)
     R_emp=0
-    for _ in range(total):
-        R_emp+=queue.get()
-    pipe_cooenction.send(R_emp/total)
-
-def sig_cost_worker(queue,weights,bias,x,y):
-    emp_distribution = get_sample_emp_distribution(weights,x)
-    queue.put(prob_x_div_corretto(emp_distribution, y, bias))
+    for i in range(0, NUM_DATA, chunks): 
+        p=mp.Process(target=sig_worker,args=(queue,weights,bias,X[i:i + chunks],Y[i:i+chunks]),daemon=True)
+        p.start()
     
-def sig_cost_function_single_thread(weights, bias, X, Y):
+    for i in range(TOT_CORES):
+        R_emp += queue.get()
+    return R_emp/NUM_DATA
+
+def sig_worker(queue,weights,bias,X,Y):
     R_emp=0
     for x,y in zip(X,Y):
         emp_distribution = get_sample_emp_distribution(weights,x)
         #probabilità che la label assegnata sia diversa da quella corretta, va minimizzato 
         R_emp+=prob_x_div_corretto(emp_distribution, y, bias)
-    return R_emp/len(X) #cost function classica, do ad ogni sample lo stesso peso
+    queue.put(R_emp)
 
+####################### NON NECESSARI AL THREAD ##################
 if __name__ == '__main__':
+
+    def sig_cost_function_single_thread(weights, bias, X, Y):
+        R_emp=0
+        for x,y in zip(X,Y):
+            emp_distribution = get_sample_emp_distribution(weights,x)
+            #probabilità che la label assegnata sia diversa da quella corretta, va minimizzato 
+            R_emp+=prob_x_div_corretto(emp_distribution, y, bias)
+        return R_emp/len(X) #cost function classica, do ad ogni sample lo stesso peso
+    
     def cross_entropy_cost(weights, X, Y):
         R_emp=0
         for x,y in zip(X,Y):
@@ -168,8 +174,8 @@ if __name__ == '__main__':
         print(
             f"\nRunning the {opt.__class__.__name__} optimizer for {num_steps} iterations."
         )
-        step=0
-        for i in range(num_steps):
+
+        for step in range(num_steps):
             # Print out the status of the optimization
             if step % 10 == 0:
                 print(
@@ -188,21 +194,20 @@ if __name__ == '__main__':
             # Perform an update step
             # weights, _, _ = opt.step(cost_function, weights, feats_train_batch, Y_train_batch)
             if len(init_param)==3:
+                inizio =time.time()
+                
                 weights, _, _ = opt.step(cost_function, weights, X_param, Y_param)
                 history.append([(step + 1) * execs_per_step]+scores(cost_function,weights, X_param, Y_param, feats_val, Y_val))
+                
+                fine=time.time()
+                print(fine-inizio)
             elif len(init_param)==4:
+                inizio =time.time()
                 weights, bias, _, _ = opt.step(cost_function, weights, bias, X_param, Y_param)
                 history.append([(step + 1) * execs_per_step]+scores(cost_function, weights,  X_param, Y_param, feats_val, Y_val,bias))
-
-            step+=1
-            # pred=numpy.empty(len(feats_train),dtype=int)
-            # for i in range(len(feats_train)):
-            #     emp=variational_classifier(weights,feats_train[i],[-1,1])
-            #     l=int(max(zip(emp.values(), emp.keys()))[1])
-            #     pred[i]=l
-            # print(GL.accuracy(Y,pred))
-            # print(auc_train)
-
+                fine=time.time()
+                
+                print("tempo impiegato",fine-inizio)
 
         print(
             f"Step {num_steps:3d}: Circuit executions: {history[-1][0]:4d}, "
@@ -265,7 +270,7 @@ if __name__ == '__main__':
             )
         elif COST_WITH_BIAS == True:
             history, weights = run_optimizer(
-            opt, sig_cost_function_process_multithread, [weights,bias,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+            opt, sig_cost_function_single_thread, [weights,bias,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
             )
 
         

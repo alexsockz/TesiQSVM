@@ -4,6 +4,8 @@ from screeninfo import get_monitors
 import os, os.path
 from sys import exit
 
+parent_dir = os.path.dirname(os.getcwd())+"\dati\\"
+
 MAX_LINE_WIDTH=0.5
 DATA_LINE_WIDTH=0.8
 i=0
@@ -118,7 +120,7 @@ inp_s=input("salvare immagini (y: si n: no)")
 
 
 if inp_c=='s' and inp_e==1:
-    directory="C:\AAAAFolderVsCode\TesiQSVM\dati\sigLoss\exec1\data"
+    directory=parent_dir+"sigLoss\exec1\data"
     ax=fig.add_axes(rect=(1/8,1/8, 6/8,3/8),fc="gray")
     ax2=fig.add_axes(rect=(1/8,4/8, 6/8,3/8),fc="gray")
 
@@ -130,7 +132,7 @@ elif type(inp_e) is int:
         costf="sigLoss"
     elif inp_c=='c':
         costf="crossEntropy"
-    directory="C:\AAAAFolderVsCode\TesiQSVM\dati\\"+costf+"\exec"+str(inp_e)
+    directory=parent_dir+costf+"\exec"+str(inp_e)
     ax3=fig.add_axes(rect=(1/8,1/11, 6/8,3/11),fc="gray")
     ax=fig.add_axes(rect=(1/8,4/11, 6/8,3/11),fc="gray")
     ax2=fig.add_axes(rect=(1/8,7/11, 6/8,3/11),fc="gray")

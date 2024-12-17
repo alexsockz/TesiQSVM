@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from screeninfo import get_monitors
+from tkinter import filedialog
 import os, os.path
 from sys import exit
 
-parent_dir = os.path.dirname(os.getcwd())+"\dati\\"
+
+directory=filedialog.askdirectory()
 
 MAX_LINE_WIDTH=0.5
 DATA_LINE_WIDTH=0.8
@@ -20,10 +21,7 @@ def event(event):
         print(event.key)
         return
 
-    if inp_c=='s' and inp_e==1:
-        plot_exec1(directory,i)
-    else:
-        plot_exec2(directory,i)
+    plot_exec2(directory,i)
     fig.canvas.draw()
 
 def plot_exec1(directory,i):
@@ -73,7 +71,7 @@ def plot_exec2(directory,i):
     ax2.clear()
     ax3.clear()
 
-    ax2.set_title("iterazione "+str(i%NFILE)+" esecuzione "+str(inp_e)+" "+costf)
+    ax2.set_title("iterazione "+str(i%NFILE)+" esecuzione")
 
     ax.plot(X,cost,c="yellow",linewidth=DATA_LINE_WIDTH)
 
@@ -114,42 +112,43 @@ def plot_exec2(directory,i):
 
 fig=plt.figure(layout="compressed")
 
-inp_c=input("scegliere cost function (c: cross entropy, s: sigmoid)")
-inp_e=int(input("scegliere esecuzione"))
+# inp_c=input("scegliere cost function (c: cross entropy, s: sigmoid)")
+# inp_e=int(input("scegliere esecuzione"))
 inp_s=input("salvare immagini (y: si n: no)")
 
 
-if inp_c=='s' and inp_e==1:
-    directory=parent_dir+"sigLoss\exec1\data"
-    ax=fig.add_axes(rect=(1/8,1/8, 6/8,3/8),fc="gray")
-    ax2=fig.add_axes(rect=(1/8,4/8, 6/8,3/8),fc="gray")
+# if inp_c=='s' and inp_e==1:
+#     directory=parent_dir+"sigLoss\exec1\data"
+#     ax=fig.add_axes(rect=(1/8,1/8, 6/8,3/8),fc="gray")
+#     ax2=fig.add_axes(rect=(1/8,4/8, 6/8,3/8),fc="gray")
 
-    NFILE=len([name for name in os.listdir(directory) if os.path.isfile(os.path.join(directory, name))])-1
-    plot_exec1(directory,i)
-    fig.canvas.draw()
-elif type(inp_e) is int:
-    if inp_c=='s':
-        costf="sigLoss"
-    elif inp_c=='c':
-        costf="crossEntropy"
-    directory=parent_dir+costf+"\exec"+str(inp_e)
-    ax3=fig.add_axes(rect=(1/8,1/11, 6/8,3/11),fc="gray")
-    ax=fig.add_axes(rect=(1/8,4/11, 6/8,3/11),fc="gray")
-    ax2=fig.add_axes(rect=(1/8,7/11, 6/8,3/11),fc="gray")
+#     NFILE=len([name for name in os.listdir(directory) if os.path.isfile(os.path.join(directory, name))])-1
+#     plot_exec1(directory,i)
+#     fig.canvas.draw()
+# elif type(inp_e) is int:
+#     if inp_c=='s':
+#         costf="sigLoss"
+#     elif inp_c=='c':
+#         costf="crossEntropy"
+#     directory=parent_dir+costf+"\exec"+str(inp_e)
 
-    NFILE=len([name for name in os.listdir(directory) if os.path.isfile(os.path.join(directory, name))])-1
+ax3=fig.add_axes(rect=(1/8,1/11, 6/8,3/11),fc="gray")
+ax=fig.add_axes(rect=(1/8,4/11, 6/8,3/11),fc="gray")
+ax2=fig.add_axes(rect=(1/8,7/11, 6/8,3/11),fc="gray")
+
+NFILE=len([name for name in os.listdir(directory) if os.path.isfile(os.path.join(directory, name))])-1
     
-    if(inp_s=='y'):
-        for l in range(NFILE):
-            plot_exec2(directory,l)
-            d=directory+"\imgs\data"+str(l)+".pdf"
-            fig.set_figwidth(16)
-            fig.set_figheight(9)
-            fig.savefig(d,format="pdf")
+if(inp_s=='y'):
+    for l in range(NFILE):
+        plot_exec2(directory,l)
+        d=directory+"\imgs\data"+str(l)+".pdf"
+        fig.set_figwidth(16)
+        fig.set_figheight(9)
+        fig.savefig(d,format="pdf")
     
-    plot_exec2(directory,i)
-    fig.canvas.draw()
-else: exit()
+plot_exec2(directory,i)
+fig.canvas.draw()
+
 
 
 fig.canvas.mpl_connect('key_press_event', event)

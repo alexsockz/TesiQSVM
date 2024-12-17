@@ -12,13 +12,15 @@ import time
 from qiskit_machine_learning.algorithms.classifiers import VQC
 from qiskit_machine_learning.optimizers import SPSA
 from qiskit.primitives import Sampler
+import genLib
 
-iris_data = load_iris()
-features = iris_data.data
-labels = iris_data.target
+X,Y = genLib.get_blood_transfer_data()
 
-df = pd.DataFrame(iris_data.data, columns=iris_data.feature_names)
-df["class"] = pd.Series(iris_data.target)
+features = X
+labels = Y
+
+df = pd.DataFrame(X)
+df["class"] = pd.Series(Y)
 
 sns.pairplot(df, hue="class", palette="tab10")
 

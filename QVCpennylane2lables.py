@@ -1,21 +1,30 @@
-import pennylane as qml
-from pennylane import numpy as np
+
+import multiprocessing as mp
+import genLib as GL
 import numpy 
+from pennylane import numpy as np
+import pennylane as qml
 
-SHOTS=1000
-data = numpy.genfromtxt("iris3.csv",delimiter=",", dtype=str)
-X = np.array(data[:, :-1], dtype=float)
-#REMEMBER: devo indicare il tipo della label, cerco di essere il piu generico possibile in modo da classificare anche stringhe
-Y = numpy.array(data[:, -1], dtype=float)
+if __name__ == '__main__':
+    TOT_CORES= mp.cpu_count()
+    pool = mp.Pool(TOT_CORES)
+    
+    X,Y = GL.get_iris()
+    print(X[0])
 
+    #Nota a bene NUM_DATA non deve essere usato per i dati dopo che sono stati suddivisi in train e test batch
+    NUM_DATA = len(Y)
+
+#NOTE: DIMENSIONS deve essere modificato a seconda del database, non è estratto dai dati in quando necessario per i sottoprocessi, e per evitare overhead evitiamo anche 
+DIMENSIONS = 4
 train_perc=0.75
-NUM_DATA = len(Y)
-DIMENSIONS = len(X[0])
+
 NUM_LAYERS = 4
 BATCH_SIZE = 20
 NUM_STEPS_SPSA =300
 COST_WITH_BIAS=True
 
+SHOTS=1000
 dev = qml.device("lightning.qubit", shots=SHOTS, wires=DIMENSIONS)
 @qml.qnode(dev)
 def circuit(weights, x):
@@ -30,12 +39,13 @@ def circuit(weights, x):
     return (qml.counts(qml.Y(0))) 
 
 ################# GLI IMPORT DEVONO STARE DOPO LA DICHIARAZIONE DEL CIRCUITO PER QUALCHE MOTIVO ###########################################
-from sklearn.metrics import roc_auc_score, accuracy_score
-from sklearn.model_selection import train_test_split
-import genLib as GL
 import multiprocessing as mp
-from math import ceil
-import time
+if __name__ == '__main__':
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import roc_auc_score, accuracy_score,f1_score,precision_recall_curve,auc
+    from math import ceil
+    import time
+    from functools import partial
 
 ################# NECESSARI PER THREAD ###########################################
 def variational_classifier(weights, x, labels):
@@ -47,11 +57,6 @@ def variational_classifier(weights, x, labels):
     else:
         raise TypeError("x must be a 1 dim list (a data element)")
 
-def get_sample_emp_distribution(weights,x):
-        #equivalente nella cross entropy, consulto il circuito R volte e alcune volte ritorna -1 altre 1
-        samples=variational_classifier(weights,x, [-1,1])
-        #\ calcolo la distribuzione di probabilità che sia 1 o -1
-        return {k:v/SHOTS for k,v in samples.items()}
 
 def prob_x_div_corretto(pmf,correct, bias):
     #dobbiamo capire quale è la probabilità che il predict di x sia diverso dalla sua corretta label e minimizzarlo
@@ -74,54 +79,113 @@ def prob_x_div_corretto(pmf,correct, bias):
     p=1/(1+np.exp(-f)) #sigmoide della funzione 
     return p
 
-
-def sig_cost_function_process_multithread(weights, bias, X, Y):
-    TOT_CORES= mp.cpu_count()
-    chunks=ceil(NUM_DATA/TOT_CORES)
-
-    queue = mp.Queue(maxsize=TOT_CORES)
-    R_emp=0
-    for i in range(0, NUM_DATA, chunks): 
-        p=mp.Process(target=sig_worker,args=(queue,weights,bias,X[i:i + chunks],Y[i:i+chunks]),daemon=True)
-        p.start()
-    
-    for i in range(TOT_CORES):
-        R_emp += queue.get()
-    return R_emp/NUM_DATA
-
-def sig_worker(queue,weights,bias,X,Y):
-    R_emp=0
-    for x,y in zip(X,Y):
-        emp_distribution = get_sample_emp_distribution(weights,x)
-        #probabilità che la label assegnata sia diversa da quella corretta, va minimizzato 
-        R_emp+=prob_x_div_corretto(emp_distribution, y, bias)
-    queue.put(R_emp)
-
-####################### NON NECESSARI AL THREAD ##################
-if __name__ == '__main__':
-
-    def sig_cost_function_single_thread(weights, bias, X, Y):
-        R_emp=0
-        for x,y in zip(X,Y):
-            emp_distribution = get_sample_emp_distribution(weights,x)
-            #probabilità che la label assegnata sia diversa da quella corretta, va minimizzato 
-            R_emp+=prob_x_div_corretto(emp_distribution, y, bias)
-        return R_emp/len(X) #cost function classica, do ad ogni sample lo stesso peso
-    
-    def cross_entropy_cost(weights, X, Y):
-        R_emp=0
-        for x,y in zip(X,Y):
-            emp_distribution = get_sample_emp_distribution(weights,x)
-            R_emp+=cross_entropy_loss(emp_distribution, y)
-            
-        return R_emp/len(X)
-
-    def cross_entropy_loss(emp_distribution, y):
+def cross_entropy_loss(emp_distribution, y):
     # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.log_loss.html
             corrected_label= (y+1)/2
             p_1=emp_distribution[1]
             return -(((corrected_label)*np.log(p_1))+((1-corrected_label)*np.log(1-p_1)))
+
+def get_sample_emp_distribution(weights,x):
+        #equivalente nella cross entropy, consulto il circuito R volte e alcune volte ritorna -1 altre 1
+        samples=variational_classifier(weights,x, [-1,1])
+        #\ calcolo la distribuzione di probabilità che sia 1 o -1
+        return {k:v/SHOTS for k,v in samples.items()}
+
+def sig_worker(weights,bias,data):
+    try:
+        R_emp=0
+        for x,y in data:
+            emp_distribution = get_sample_emp_distribution(weights,x)
+            #probabilità che la label assegnata sia diversa da quella corretta, va minimizzato 
+            R_emp+=prob_x_div_corretto(emp_distribution, y, bias)
+        return R_emp
+    except KeyboardInterrupt:
+        return
+    
+def entropy_worker(weights, data):
+    try:
+        R_emp=0
+        for x,y in data:
+            emp_distribution = get_sample_emp_distribution(weights,x)
+            R_emp+=cross_entropy_loss(emp_distribution, y)
+        return R_emp
+    except KeyboardInterrupt:
+            return
+
+def predict_worker(weights, X):
+    try:
+        pred=numpy.empty(0,dtype=int)
+        emp_distr_list=numpy.empty(0, dtype=dict)
+        for x in X:
+            emp_distribution = get_sample_emp_distribution(weights,x)
+            l=int(max(zip(emp_distribution.values(), emp_distribution.keys()))[1])
+            pred=numpy.append(pred,l)
+            emp_distr_list=numpy.append(emp_distr_list,emp_distribution)
+
+        return pred, emp_distr_list #forse meglio aggiungere .copy()? nah
+    except KeyboardInterrupt:
+        return
+########################### NON NECESSARI AL THREAD, EVITA OVERHEAD ###########################
+if __name__ == '__main__':
+    def sig_cost_function_process_multithread(weights, bias, X, Y):
+        try:
+            chunks=ceil(len(X)/TOT_CORES)
+            R_emp=0
+            data=[]
+            for i in range(0, len(X),chunks):
+                data.append(zip(X[i:i + chunks],Y[i:i+chunks]))
+            #print(data)
+            results= pool.imap(partial(sig_worker,weights,bias), data)
+            #count=0
+            for result in results:
+                #count+=1
+                R_emp+=result
+            #print("se corretto è uguale al numero di core", count)
+            return R_emp/len(X)
+        except KeyboardInterrupt:
+            pool.terminate()
+            raise KeyboardInterrupt
+    
+    def cross_entropy_process_multithread(weights, X, Y):
+        try:
+            chunks=ceil(len(X)/TOT_CORES)
+            R_emp=0
+            data=[]
+            for i in range(0, len(X),chunks):
+                data.append(zip(X[i:i + chunks],Y[i:i+chunks]))
+            #print(data)
+            results= pool.imap(partial(entropy_worker,weights), data)
+            #count=0
+            for result in results:
+                #count+=1
+                R_emp+=result
+            #print("se corretto è uguale al numero di core", count)
+            return R_emp/len(X)
+        except KeyboardInterrupt:
+            pool.terminate()
+            raise KeyboardInterrupt
+
     def predict(X, weights):
+        try:
+            pred=numpy.empty(0,dtype=int)
+            emp_distr_list=numpy.empty(0, dtype=dict)
+            chunks=ceil(len(X)/TOT_CORES)
+            data=[]
+            for i in range(0, len(X),chunks):
+                a=iter(X[i:i + chunks])
+                data.append(a)
+            #pool map mantiene l'ordine dei risultati
+            results= pool.map(partial(predict_worker,weights), data)
+            for result in results:
+                p,e= result
+                pred=numpy.append(pred,p)
+                emp_distr_list=numpy.append(emp_distr_list,e)
+            return pred, emp_distr_list
+        except KeyboardInterrupt:
+            pool.terminate()
+            raise KeyboardInterrupt
+    
+    def predict_single_thread(X, weights):
         pred=numpy.empty(0,dtype=int)
         emp_distr_list=numpy.empty(0, dtype=dict)
         for x in X:
@@ -131,6 +195,22 @@ if __name__ == '__main__':
             emp_distr_list=numpy.append(emp_distr_list,emp_distribution)
 
         return pred, emp_distr_list
+
+    #tengo single thread perchè può tornare utile su architetture in cui ci sono troppi pochi core
+    def sig_cost_function_single_thread(weights, bias, X, Y):
+        R_emp=0
+        for x,y in zip(X,Y):
+            emp_distribution = get_sample_emp_distribution(weights,x)
+            #probabilità che la label assegnata sia diversa da quella corretta, va minimizzato 
+            R_emp+=prob_x_div_corretto(emp_distribution, y, bias)
+        return R_emp/len(X) #cost function classica, do ad ogni sample lo stesso peso
+    
+    def cross_entropy_cost_single_thread(weights, X, Y):
+        R_emp=0
+        for x,y in zip(X,Y):
+            emp_distribution = get_sample_emp_distribution(weights,x)
+            R_emp+=cross_entropy_loss(emp_distribution, y)
+        return R_emp/len(X)
 
 
     def scores(cost_function, weights, X,Y,feats_val,Y_val, bias=None):
@@ -144,7 +224,10 @@ if __name__ == '__main__':
         accuracy_train=accuracy_score(Y,pred_train)
         p_pos_train=[i[1] for i in emp_train]
         auc_train=roc_auc_score(Y,p_pos_train)
+        f1_train=f1_score(Y,pred_train)
 
+        precision, recall, thresholds = precision_recall_curve(Y, p_pos_train)
+        auc_pr_train = auc(recall, precision)
 
         pred_val, emp_val=predict(feats_val,weights)
 
@@ -153,10 +236,13 @@ if __name__ == '__main__':
         p_pos_val=[i[1] for i in emp_val]
         #print(emp_val[0],p_pos_val[0], pred_val[0])
         auc_val=roc_auc_score(Y_val,p_pos_val)
+        f1_val=f1_score(Y_val,pred_val)
+        precision, recall, thresholds = precision_recall_curve(Y_val, p_pos_val)
+        auc_pr_val = auc(recall, precision)
 
-        print("accuracy: ",accuracy_train," auc: ",auc_train)
+        print("accuracy: ",accuracy_train," auc roc: ",auc_train,"f1: ",f1_train,"auc pr: ",auc_pr_train)
 
-        return [cost,accuracy_train,auc_train,accuracy_val,auc_val]
+        return [cost,accuracy_train,auc_train,accuracy_val,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val]
 
     def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, interval, execs_per_step):
         # Copy the initial parameters to make sure they are never overwritten
@@ -216,28 +302,27 @@ if __name__ == '__main__':
         return history, weights
 
 
-################### main ###################
-
+########################### main ###########################
+    
     print("prima riga pre normalizzazione",X[0],"   ",Y[0])
     features=GL.normalize2pi(X)
     print("prima riga post normalizzazione", features[0],"   ", Y[0])
     if NUM_DATA==len(features): print("corrette dimesioni")
 
+    # print tutti i dati
+    # for x,y in zip(X, Y):
+    #     print(f"x = {x}, y = {y}")        
+
     print(len(features))
 
     #suddivisione 
-    for i in range(30):
+    for i in range(15):
         feats_train, feats_val, Y_train, Y_val = train_test_split(
             features, Y, train_size=train_perc
         )
-        #dipende dai dati
-        #Y = Y * 2 - 1  # shift label from {0, 1} to {-1, 1}
 
-        # print tutti i dati
-        # for x,y in zip(X, Y):
-        #     print(f"x = {x}, y = {y}")        
 
-        ########## setup pesi ##########
+########################### setup pesi ###########################
 
         #come descritto nel paper, limito le rotazioni su Pauli Z e Y,
         #uso una lista anziche una matrice
@@ -255,26 +340,28 @@ if __name__ == '__main__':
         bias = bias_init
 
 
-        ############# PRINT PER CONTROLLARE IL CIRCUITO #######################
+########################### PRINT PER CONTROLLARE IL CIRCUITO ###########################
         print(feats_train[0])
         GL.print_circuit(weights, feats_train[0],circuit)
 
         #input("Press Enter to continue...")
 
-        ######################## ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
+########################### ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
 
         opt= qml.SPSAOptimizer(NUM_STEPS_SPSA,)
         if COST_WITH_BIAS == False:
             history, weights = run_optimizer(
-            opt, cross_entropy_cost, [weights,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+            opt, cross_entropy_process_multithread, [weights,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
             )
         elif COST_WITH_BIAS == True:
             history, weights = run_optimizer(
-            opt, sig_cost_function_single_thread, [weights,bias,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+            opt, sig_cost_function_process_multithread, [weights,bias,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
             )
 
         
-        numpy.savetxt("data"+str(i)+".csv",history, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f'], header="iter,cost,accuracy_train,auc_train,accuracy_val,auc_val")
+        numpy.savetxt("iris\data"+str(i)+".csv",history, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f'], header="iter,cost,accuracy_train,auc_train,accuracy_val,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val")
         # print(weights)
-
+###################################################################################################################################################
         # print(weights==weights2)
+    pool.close()
+    pool.join()

@@ -1,7 +1,7 @@
 import pennylane as qml
 from pennylane import numpy as np
 from sklearn.preprocessing import normalize
-
+from numpy import array, genfromtxt
 #da modificare in base al tipo di entanglement che vogliamo, questo è ciclico
 def ansatz(weights, iterations, dimensions):
     for wire in range(dimensions):
@@ -111,3 +111,25 @@ def plot_roc_curve(true_y, y_prob):
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
 
+def get_iris():
+    data = genfromtxt("iris3.csv",delimiter=",", dtype=str)
+    X = np.array(data[:, :-1], dtype=float)
+    #REMEMBER: devo indicare il tipo della label, cerco di essere il piu generico possibile in modo da classificare anche stringhe
+    Y = array(data[:, -1], dtype=float)
+    
+    return X,Y
+def get_breast_cancer_data():
+    data = genfromtxt("breast-cancer-wisconsin2.data", delimiter=",", dtype=str)
+    X = np.array(data[:, 1:-1], dtype=float)
+    Y = array(data[:, -1], dtype=float)
+    Y=Y-3 #shift label from {2, 4} to {-1, 1}
+    return X,Y
+
+def get_blood_transfer_data():
+    data = genfromtxt("transfusion.data",delimiter=",", dtype=str)
+    X = np.array(data[:, :-1], dtype=float)
+    #REMEMBER: devo indicare il tipo della label, cerco di essere il piu generico possibile in modo da classificare anche stringhe
+    Y = array(data[:, -1], dtype=float)
+    Y = Y * 2 - 1  # shift label from {0, 1} to {-1, 1}
+    return X,Y
+    

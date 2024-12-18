@@ -22,7 +22,7 @@ train_perc=0.75
 NUM_LAYERS = 4
 BATCH_SIZE = 20
 NUM_STEPS_SPSA =300
-COST_WITH_BIAS=True
+COST_WITH_BIAS=False
 
 SHOTS=1000
 dev = qml.device("lightning.qubit", shots=SHOTS, wires=DIMENSIONS)
@@ -89,7 +89,7 @@ def get_sample_emp_distribution(weights,x):
         #equivalente nella cross entropy, consulto il circuito R volte e alcune volte ritorna -1 altre 1
         samples=variational_classifier(weights,x, [-1,1])
         #\ calcolo la distribuzione di probabilità che sia 1 o -1
-        return {k:v/SHOTS for k,v in samples.items()}
+        return {k:float(v)/float(SHOTS) for k,v in samples.items()}
 
 def sig_worker(weights,bias,data):
     try:
@@ -255,7 +255,7 @@ if __name__ == '__main__':
             history.append([0]+scores(cost_function,weights,X_param,Y_param,feats_val,Y_val,bias))
         # Initialize the memory for cost values during the optimization
         # Monitor the initial cost value
-        
+        weights_init=weights.copy()
 
         print(
             f"\nRunning the {opt.__class__.__name__} optimizer for {num_steps} iterations."
@@ -299,6 +299,11 @@ if __name__ == '__main__':
             f"Step {num_steps:3d}: Circuit executions: {history[-1][0]:4d}, "
             f"Cost = {history[-1][1]}"
         )
+        a,b = predict(X_param,weights_init)
+        print(a,b)
+        a,b = predict(X_param,weights)
+        print(a,b)
+        print(weights)
         return history, weights
 
 
@@ -348,14 +353,14 @@ if __name__ == '__main__':
 
 ########################### ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
 
-        opt= qml.SPSAOptimizer(NUM_STEPS_SPSA,)
+        opt= qml.GradientDescentOptimizer()
         if COST_WITH_BIAS == False:
             history, weights = run_optimizer(
-            opt, cross_entropy_process_multithread, [weights,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+            opt, cross_entropy_cost_single_thread, [weights,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
             )
         elif COST_WITH_BIAS == True:
             history, weights = run_optimizer(
-            opt, sig_cost_function_process_multithread, [weights,bias,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+            opt, sig_cost_function_single_thread, [weights,bias,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
             )
 
         
@@ -363,5 +368,68 @@ if __name__ == '__main__':
         # print(weights)
 ###################################################################################################################################################
         # print(weights==weights2)
-    pool.close()
-    pool.join()
+
+#     X,Y = GL.get_iris()
+#     print(X[0])
+
+#     #Nota a bene NUM_DATA non deve essere usato per i dati dopo che sono stati suddivisi in train e test batch
+#     NUM_DATA = len(Y)
+#     print("prima riga pre normalizzazione",X[0],"   ",Y[0])
+#     features=GL.normalize2pi(X)
+#     print("prima riga post normalizzazione", features[0],"   ", Y[0])
+#     if NUM_DATA==len(features): print("corrette dimesioni")
+
+#     # print tutti i dati
+#     # for x,y in zip(X, Y):
+#     #     print(f"x = {x}, y = {y}")        
+
+#     print(len(features))
+
+#     #suddivisione 
+#     for i in range(15):
+#         feats_train, feats_val, Y_train, Y_val = train_test_split(
+#             features, Y, train_size=train_perc
+#         )
+
+
+# ########################### setup pesi ###########################
+
+#         #come descritto nel paper, limito le rotazioni su Pauli Z e Y,
+#         #uso una lista anziche una matrice
+#         # probabilmente i pesi iniziali sono un problema
+#         #weights_init = np.random.random_sample((num_layers+1)*DIMENSIONS*2,requires_grad=True) # forse non serve 
+
+#         weights_init= np.zeros((NUM_LAYERS+1)*DIMENSIONS*2,requires_grad=True)
+#         #solo per dati binari
+#         bias_init = np.array(0.0, requires_grad=True)
+
+#         # print("Weights:", weights_init)
+#         # print("Bias: ", bias_init)
+
+#         weights = weights_init
+#         bias = bias_init
+
+
+# ########################### PRINT PER CONTROLLARE IL CIRCUITO ###########################
+#         print(feats_train[0])
+#         GL.print_circuit(weights, feats_train[0],circuit)
+
+#         #input("Press Enter to continue...")
+
+# ########################### ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
+
+#         opt= qml.GradientDescentOptimizer()
+#         if COST_WITH_BIAS == False:
+#             history, weights = run_optimizer(
+#             opt, cross_entropy_process_multithread, [weights,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+#             )
+#         elif COST_WITH_BIAS == True:
+#             history, weights = run_optimizer(
+#             opt, sig_cost_function_process_multithread, [weights,bias,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+#             )
+
+        
+#         numpy.savetxt("iris\data"+str(i)+".csv",history, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f'], header="iter,cost,accuracy_train,auc_train,accuracy_val,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val")
+    
+#     pool.close()
+#     pool.join()

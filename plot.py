@@ -109,6 +109,17 @@ def plot_exec2(directory,i):
     ax2.text(train_acc.argmax(), max(train_acc), max(train_acc), fontsize=7, horizontalalignment='right', verticalalignment='bottom')
     ax2.text(val_acc.argmax(), max(val_acc), max(val_acc), fontsize=7, horizontalalignment='right', verticalalignment='bottom')
 
+def plot_3(directory,i):
+    data = np.loadtxt(directory+"\data"+str(i%NFILE)+".csv", delimiter=",")
+    X=data[:,0]
+
+    cost=data[:,1]
+    train_acc=data[:,2]
+    val_acc=data[:,3]
+    f1_train=data[:,3]
+    f1_val=data[:,3]
+    auc_pr_train=data[:,3]
+    auc_pr_val=data[:,3]
 
 fig=plt.figure(layout="compressed")
 

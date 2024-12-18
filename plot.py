@@ -25,7 +25,7 @@ def event(event):
     fig.canvas.draw()
 
 def plot_exec1(directory,i):
-    data = np.loadtxt(directory+"\data"+str(i%NFILE)+".csv", delimiter=",")
+    data = np.loadtxt(directory+"\\data"+str(i%NFILE)+".csv", delimiter=",")
     X=data[:,0]
 
     cost=data[:,1]
@@ -58,7 +58,7 @@ def plot_exec1(directory,i):
     # figManager.window.showMaximized()
 
 def plot_exec2(directory,i):
-    data = np.loadtxt(directory+"\data"+str(i%NFILE)+".csv", delimiter=",")
+    data = np.loadtxt(directory+"\\data"+str(i%NFILE)+".csv", delimiter=",")
     #iter,cost,accuracy_train,auc_train,accuracy_val,auc_val
     X=data[:,0]
     cost=data[:,1]
@@ -110,7 +110,7 @@ def plot_exec2(directory,i):
     ax2.text(val_acc.argmax(), max(val_acc), max(val_acc), fontsize=7, horizontalalignment='right', verticalalignment='bottom')
 
 def plot_3(directory,i):
-    data = np.loadtxt(directory+"\data"+str(i%NFILE)+".csv", delimiter=",")
+    data = np.loadtxt(directory+"\\data"+str(i%NFILE)+".csv", delimiter=",")
     X=data[:,0]
 
     cost=data[:,1]
@@ -152,7 +152,7 @@ NFILE=len([name for name in os.listdir(directory) if os.path.isfile(os.path.join
 if(inp_s=='y'):
     for l in range(NFILE):
         plot_exec2(directory,l)
-        d=directory+"\imgs\data"+str(l)+".pdf"
+        d=directory+"\\imgs\\data"+str(l)+".pdf"
         fig.set_figwidth(16)
         fig.set_figheight(9)
         fig.savefig(d,format="pdf")

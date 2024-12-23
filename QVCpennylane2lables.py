@@ -42,7 +42,7 @@ def circuit(weights, x):
 import multiprocessing as mp
 if __name__ == '__main__':
     from sklearn.model_selection import train_test_split
-    from sklearn.metrics import roc_auc_score, accuracy_score,f1_score,precision_recall_curve,auc
+    from sklearn.metrics import roc_auc_score, accuracy_score,f1_score,precision_recall_curve,auc,precision_score,recall_score
     from math import ceil
     import time
     from functools import partial
@@ -229,6 +229,9 @@ if __name__ == '__main__':
         precision, recall, thresholds = precision_recall_curve(Y, p_pos_train)
         auc_pr_train = auc(recall, precision)
 
+        precision_train= precision_score(Y,pred_train)
+        recall_train= recall_score(Y,pred_train)
+
         pred_val, emp_val=predict(feats_val,weights)
 
         accuracy_val=accuracy_score(Y_val,pred_val)
@@ -240,9 +243,12 @@ if __name__ == '__main__':
         precision, recall, thresholds = precision_recall_curve(Y_val, p_pos_val)
         auc_pr_val = auc(recall, precision)
 
+        precision_val= precision_score(Y_val,pred_val)
+        recall_val= recall_score(Y_val,pred_val)
+
         print("accuracy: ",accuracy_train," auc roc: ",auc_train,"f1: ",f1_train,"auc pr: ",auc_pr_train)
 
-        return [cost,accuracy_train,auc_train,accuracy_val,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val]
+        return [cost,accuracy_train,accuracy_val,auc_train,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val,precision_train,precision_val,recall_train,recall_val]
 
     def run_optimizer(opt, cost_function, init_param, feats_val,Y_val, num_steps, interval, execs_per_step):
         # Copy the initial parameters to make sure they are never overwritten
@@ -289,7 +295,10 @@ if __name__ == '__main__':
                 print(fine-inizio)
             elif len(init_param)==4:
                 inizio =time.time()
-                weights, _, _, _ = opt.step(cost_function, weights, bias, X_param, Y_param) #HO TOLTO IL BIAS
+                weights, bias_nxt, _, _ = opt.step(cost_function, weights, bias, X_param, Y_param) #HO RI MESSO IL BIAS
+
+                bias=(bias_nxt-bias)/1000+bias #TENTATIVO DI DIMOSTRARE CHE SE IL BIAS NON DEVE PRENDERE IL CONTROLLO DELLA RIDUZIONE DELLA COST FUNCTION
+
                 history.append([(step + 1) * execs_per_step]+scores(cost_function, weights,  X_param, Y_param, feats_val, Y_val,bias)+[bias])
                 fine=time.time()
                 
@@ -321,7 +330,7 @@ if __name__ == '__main__':
     print(len(features))
 
     #suddivisione 
-    for i in range(15):
+    for i in range(70):
         feats_train, feats_val, Y_train, Y_val = train_test_split(
             features, Y, train_size=train_perc
         )
@@ -364,7 +373,78 @@ if __name__ == '__main__':
             )
 
         
-        numpy.savetxt("iris\data"+str(i)+".csv",history, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f'], header="iter,cost,accuracy_train,auc_train,accuracy_val,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val,bias")
+        numpy.savetxt(
+            "iris\data"+str(i)+".csv",
+            history,
+            delimiter=",", 
+            fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f'], 
+            header="iter,cost,accuracy_train,accuracy_val,auc_train,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val,precision_train,precision_val,recall_train,recall_val,bias")
         # print(weights)
 ###################################################################################################################################################
         # print(weights==weights2)
+
+#     X,Y = GL.get_blood_transfer_data()
+#     print(X[0])
+
+#     #Nota a bene NUM_DATA non deve essere usato per i dati dopo che sono stati suddivisi in train e test batch
+#     NUM_DATA = len(Y)
+
+#     print("prima riga pre normalizzazione",X[0],"   ",Y[0])
+#     features=GL.normalize2pi(X)
+#     print("prima riga post normalizzazione", features[0],"   ", Y[0])
+#     if NUM_DATA==len(features): print("corrette dimesioni")
+
+#     # print tutti i dati
+#     # for x,y in zip(X, Y):
+#     #     print(f"x = {x}, y = {y}")        
+
+#     print(len(features))
+
+#     #suddivisione 
+#     for i in range(15):
+#         feats_train, feats_val, Y_train, Y_val = train_test_split(
+#             features, Y, train_size=train_perc
+#         )
+
+
+# ########################### setup pesi ###########################
+
+#         #come descritto nel paper, limito le rotazioni su Pauli Z e Y,
+#         #uso una lista anziche una matrice
+#         # probabilmente i pesi iniziali sono un problema
+#         #weights_init = np.random.random_sample((num_layers+1)*DIMENSIONS*2,requires_grad=True) # forse non serve 
+
+#         weights_init= np.zeros((NUM_LAYERS+1)*DIMENSIONS*2,requires_grad=True)
+#         #solo per dati binari
+#         bias_init = np.array(0.0, requires_grad=True)
+
+#         # print("Weights:", weights_init)
+#         # print("Bias: ", bias_init)
+
+#         weights = weights_init
+#         bias = bias_init
+
+
+# ########################### PRINT PER CONTROLLARE IL CIRCUITO ###########################
+#         print(feats_train[0])
+#         GL.print_circuit(weights, feats_train[0],circuit)
+
+#         #input("Press Enter to continue...")
+
+# ########################### ZONA DI OBLIO DOVE TUTTO VIENE MODIFICATO ###########################
+
+#         opt= qml.SPSAOptimizer(NUM_STEPS_SPSA)
+#         if COST_WITH_BIAS == False:
+#             history, weights = run_optimizer(
+#             opt, cross_entropy_process_multithread, [weights,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+#             )
+#         elif COST_WITH_BIAS == True:
+#             history, weights = run_optimizer(
+#             opt, sig_cost_function_process_multithread, [weights,bias,feats_train,Y_train], feats_val,Y_val, NUM_STEPS_SPSA, 20, 1
+#             )
+
+        
+#         numpy.savetxt("blood_transfer\data"+str(i)+".csv",history, delimiter=",", fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f'], header="iter,cost,accuracy_train,auc_train,accuracy_val,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val,bias")
+#         # print(weights)
+# ###################################################################################################################################################
+#         # print(weights==weights2)

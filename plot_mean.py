@@ -6,25 +6,13 @@ directory=filedialog.askdirectory()
 
 MAX_LINE_WIDTH=0.5
 DATA_LINE_WIDTH=0.8
-i=0
-def event(event):
-    global i
-    #print(event.key)
-    if event.key=='left':
-        i= i-1
-    elif event.key=="right":
-        i= i+1
-    else: 
-        print(event.key)
-        return
 
-    plot(directory,i)
-    fig.canvas.draw()
 #iter,cost,accuracy_train,accuracy_val,auc_train,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val,precision_train,precision_val,recall_train,recall_val,bias
-def plot(directory,i):
-    data = np.loadtxt(directory+"\\data"+str(i%NFILE)+".csv", delimiter=",")
+def plot(directory):
+    data = np.loadtxt(directory+"\\data0.csv", delimiter=",")
+    var = np.loadtxt(directory+"\\variance.csv", delimiter=",")
+    fig.suptitle("media")
 
-    fig.suptitle("iterazione "+str(i%NFILE)+" esecuzione")
     X=data[:,0]
     cost=data[:,1]
     bias=data[:,-1]
@@ -37,10 +25,14 @@ def plot(directory,i):
         for r in range(ROWS):
             ax[r,c].set_title(ax[r][c].get_label())
             ax[r,c].plot(X,cost,c="yellow",linewidth=DATA_LINE_WIDTH)
+            ax[r,c].fill_between(X,cost-var[:,1],cost+var[:,1],linewidth=0,color="#ffffe0")
+            
             ax[r,c].plot(X,bias,c="orange",linewidth=DATA_LINE_WIDTH)
+            ax[r,c].fill_between(X,bias-var[:,-1],bias+var[:,-1],linewidth=0,color="#FFD580")
+
             ax[r,c].plot(X,data[:,position],color="blue",linewidth=DATA_LINE_WIDTH)
             ax[r,c].plot(X,data[:,position+1],color="darkgreen", linewidth=DATA_LINE_WIDTH)
-            ax[r,c].fill_between(X,data[:,position],data[:,position+1],linewidth=0,color="limegreen")
+            ax[r,c].fill_between(X,data[:,position]-var[:,position],data[:,position]+var[:,position],linewidth=0,color="lightblue")
             ax[r,c].set_ylim(0,1)
             ax[r,c].set_ybound(-0.1,1.1)
             position+=2
@@ -48,7 +40,7 @@ def plot(directory,i):
     
 fig=plt.figure(layout="compressed")
 
-fig.canvas.manager.set_window_title(directory)
+
 # inp_c=input("scegliere cost function (c: cross entropy, s: sigmoid)")
 # inp_e=int(input("scegliere esecuzione"))
 inp_s=input("salvare immagini (y: si n: no)")
@@ -78,8 +70,7 @@ if(inp_s=='y'):
         os.makedirs(directory+"\\imgs", exist_ok=True)
         fig.savefig(d,format="pdf")
 
-plot(directory,i)
+plot(directory)
 fig.canvas.draw()
 
-fig.canvas.mpl_connect('key_press_event', event)
 plt.show()

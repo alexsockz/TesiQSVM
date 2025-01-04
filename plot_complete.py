@@ -33,16 +33,24 @@ def plot(directory,i):
             ax[r][c].clear()
 
     position=2
+    legend_lables=["iter","cost","accuracy_train","accuracy_val","auc_train","auc_val","f1_train","f1_val","auc_pr_train","auc_pr_val","precision_train","precision_val","recall_train","recall_val","bias"]
     for c in range(COLS):
         for r in range(ROWS):
             ax[r,c].set_title(ax[r][c].get_label())
-            ax[r,c].plot(X,cost,c="yellow",linewidth=DATA_LINE_WIDTH)
-            ax[r,c].plot(X,bias,c="orange",linewidth=DATA_LINE_WIDTH)
-            ax[r,c].plot(X,data[:,position],color="blue",linewidth=DATA_LINE_WIDTH)
-            ax[r,c].plot(X,data[:,position+1],color="darkgreen", linewidth=DATA_LINE_WIDTH)
+            cost_artist, = ax[r,c].plot(X,cost,c="yellow",linewidth=DATA_LINE_WIDTH)
+            bias_artist, = ax[r,c].plot(X,bias,c="orange",linewidth=DATA_LINE_WIDTH)
+            train_artist, = ax[r,c].plot(X,data[:,position],color="blue",linewidth=DATA_LINE_WIDTH)
+            val_artist, = ax[r,c].plot(X,data[:,position+1],color="darkgreen", linewidth=DATA_LINE_WIDTH)
             ax[r,c].fill_between(X,data[:,position],data[:,position+1],linewidth=0,color="limegreen")
             ax[r,c].set_ylim(0,1)
             ax[r,c].set_ybound(-0.1,1.1)
+            if(c<COLS/2):
+                ax[r,c].legend(
+                    handles=[train_artist,val_artist,cost_artist,bias_artist],
+                    labels=["train", "valuation", "cost", "bias"],
+                    loc='upper left',
+                    bbox_to_anchor=(1.05, 1),
+                    )
             position+=2
 
     
@@ -61,7 +69,7 @@ ax=np.empty((3,2), dtype=Axes)
 labels=["Accuracy","auc ROC","F1","auc PR","Precision","Recall"]
 for c in range(COLS):
     for r in range(ROWS):
-        x_pos=0.1+0.06*(c%COLS)+0.37*c
+        x_pos=0.06+0.16*(c%COLS)+0.37*c
         y_pos=1-(0.07+0.25*(r+1)+0.06*(r%ROWS))
         ax[r,c]=fig.add_axes(rect=(x_pos,y_pos,0.37, 0.25),fc="gray",label=labels[r+c*ROWS])
         ax[r,c].set_autoscaley_on(False)

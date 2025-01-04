@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tkinter import filedialog
 import os, glob
+from math import floor
 
 directory=filedialog.askdirectory()
 NFILE=len(glob.glob1(directory,"*.csv"))
@@ -13,7 +14,8 @@ mean_matrix=np.zeros((301,14))
 mean_trimmed=np.zeros((301,14))
 median_matrix=np.zeros((301,14,NFILE))
 batch_matrix=np.zeros((301,14,5))
-best_of_5_matrix=np.zeros((301,14))
+mean_of_batch=np.zeros((301,14))
+median_of_batch=np.zeros((301,14,int(NFILE/5)+1))
 os.makedirs(directory+"\\media", exist_ok=True)
 
 ##################### mean e raccolta dati
@@ -25,7 +27,8 @@ for i in range(NFILE):
             median_matrix[r,c-1,i]=data[r,c]
             batch_matrix[r,c-1,i%5]=data[r,c]    
             if i%5==4:
-                best_of_5_matrix[r,c-1]+=batch_matrix[r,c-1,batch_matrix[r, 0,:].argsort()[0]]
+                mean_of_batch[r,c-1]+=batch_matrix[r,c-1,batch_matrix[r, 0,:].argsort()[0]]
+                median_of_batch[r,c-1,floor(i/5)]=batch_matrix[r,c-1,batch_matrix[r, 0,:].argsort()[0]]
 
 for c in range(14):
         for r in range(301):
@@ -41,7 +44,7 @@ np.savetxt(
        
 # ordina i dati in base ad una delle colonne 1=cost
 median_matrix=median_matrix[:,:,median_matrix[r,0,:].argsort()]
-
+median_of_batch=median_of_batch[:,:,median_of_batch[r,0,:].argsort()]
 
 for i in range(NFILE):
     for c in range(14):
@@ -96,12 +99,20 @@ np.savetxt(
 
 for c in range(14):
         for r in range(301):
-            best_of_5_matrix[r,c]=best_of_5_matrix[r,c]/(NFILE/5)
-best_of_5_matrix=np.c_[data[:,0],best_of_5_matrix]
+            mean_of_batch[r,c]=mean_of_batch[r,c]/(NFILE/5)
+mean_of_batch=np.c_[data[:,0],mean_of_batch]
 
 np.savetxt(
             directory+"\\media\\data3.csv",
-            best_of_5_matrix,
+            mean_of_batch,
+            delimiter=",", 
+            fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f'], 
+            header="iter,cost,accuracy_train,accuracy_val,auc_train,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val,precision_train,precision_val,recall_train,recall_val,bias")
+
+median_of_batch=np.c_[data[:,0],median_of_batch[:,:,int(NFILE/10)]]
+np.savetxt(
+            directory+"\\media\\data4.csv",
+            median_of_batch,
             delimiter=",", 
             fmt=['%d','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f','%.11f'], 
             header="iter,cost,accuracy_train,accuracy_val,auc_train,auc_val,f1_train,f1_val,auc_pr_train,auc_pr_val,precision_train,precision_val,recall_train,recall_val,bias")

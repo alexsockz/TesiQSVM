@@ -2,6 +2,7 @@ import pennylane as qml
 from pennylane import numpy as np
 from sklearn.preprocessing import normalize
 from numpy import array, genfromtxt
+from sklearn.utils import resample
 #da modificare in base al tipo di entanglement che vogliamo, questo è ciclico
 def ansatz(weights, iterations, dimensions):
     for wire in range(dimensions):
@@ -70,7 +71,7 @@ def print_circuit(weights,x,circuit):
 
 #assumo data sia un multi dimensional dataset
 def normalize2pi(data):
-    norm= normalize(data, norm="l2",axis=0)
+    norm= (normalize(data, norm="l2",axis=1)+1)*np.pi
     return norm
 
 #da sistemare, non ha senso?
@@ -132,4 +133,23 @@ def get_blood_transfer_data():
     Y = array(data[:, -1], dtype=float)
     Y = Y * 2 - 1  # shift label from {0, 1} to {-1, 1}
     return X,Y
-    
+
+def get_occupancy():
+    data=genfromtxt("occupancy.csv",delimiter=",", dtype=str)
+
+    majority_class=data[data[:,-1]=="0"]
+    print(len(majority_class))
+    minority_class=data[data[:,-1]=="1"]
+    print(len(minority_class))
+    majority_downsampled = resample(majority_class, 
+                                replace=False,  # Sample without replacement
+                                n_samples=len(minority_class),  # Equalize class sizes
+                                random_state=42)
+    # Combine the downsampled majority class with the minority class
+
+    df_balanced = np.concatenate([majority_downsampled[:50,:], minority_class[:50,:]])
+
+    X = np.array(df_balanced[:, :-1], dtype=float)
+    Y = array(df_balanced[:, -1], dtype=float)
+    Y = Y * 2 - 1  # shift label from {0, 1} to {-1, 1}
+    return X,Y
